@@ -9,7 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
-:root{--bg:#0b0f14;--card:#111827;--bd:#1f2937;--em:#10b981;--emd:#059669;--tx:#e5e7eb;--mu:#9ca3af;--rd:#ef4444;--yl:#f59e0b}
+:root{--bg:#0b0f14;--card:#111827;--bd:#1f2937;--em:#10b981;--emd:#059669;--tx:#ffffff;--mu:#9ca3af;--rd:#ef4444;--yl:#f59e0b}
 [data-theme=light]{--bg:#f3f4f6;--card:#fff;--bd:#e5e7eb;--tx:#111827;--mu:#6b7280}
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif}
 body{background:var(--bg);color:var(--tx);min-height:100vh}
@@ -47,11 +47,12 @@ nav .on{color:var(--em);border-color:var(--em);font-weight:600}
 .row{display:flex;gap:10px;flex-wrap:wrap}.row input{margin:0;flex:1;min-width:120px}
 .cv{position:relative;height:240px}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd)}th{color:var(--mu);font-weight:500}
+th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(--tx)}th{color:var(--mu);font-weight:500}
 .pop{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .pop .card{cursor:pointer;margin:0;padding:12px;position:relative;transition:border-color .15s}
 .pop .card:hover{border-color:var(--em)}
-.pop .rm-fav{position:absolute;top:8px;right:8px;color:var(--yl);font-size:14px;cursor:pointer;background:none;border:none;padding:2px}
+.pop .rm-fav{position:absolute;top:8px;right:8px;color:#ffffff;font-size:14px;cursor:pointer;background:none;border:none;padding:2px}
+.pop .rm-fav:hover{color:var(--rd)}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:800px){.grid2{grid-template-columns:1fr}}
 
@@ -63,9 +64,9 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd)}th{color:va
 .ac-item:last-child{border-bottom:none}
 .ac-item:hover,.ac-item.act{background:rgba(16,185,129,0.12)}
 .ac-left{display:flex;flex-direction:column;overflow:hidden}
-.ac-left b{color:var(--em);font-size:14px}
+.ac-left b{color:#ffffff;font-size:14px}
 .ac-left small{color:var(--mu);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ac-right{text-align:right;white-space:nowrap;font-size:13px}
+.ac-right{text-align:right;white-space:nowrap;font-size:13px;color:#ffffff}
 </style>
 </head>
 <body data-theme="dark">
@@ -167,15 +168,19 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd)}th{color:va
     <small style="color:var(--mu)">Atualiza a cada 60 s. Passe o mouse no gráfico: data, preço e quanto subiu ou desceu.</small>
   </div>
 
-  <!-- SEÇÃO FAVORITOS (LIMPA, APENAS OS CARDS) -->
+  <!-- SEÇÃO FAVORITOS -->
   <div id="fav-sec" class="hide">
-    <h3 style="margin:18px 0 10px;color:var(--yl)">Favoritos</h3>
+    <h3 style="margin:18px 0 10px;color:#ffffff">Favoritos</h3>
     <div class="pop" id="fav-list"></div>
   </div>
 
   <!-- SEÇÃO POPULARES (TOP 21 MAIORES ALTAS) -->
   <h3 style="margin:18px 0 10px">Populares (Top 21 Maiores Altas)</h3>
   <div class="pop" id="pop"></div>
+
+  <!-- SEÇÃO POPULARES (TOP 21 MAIORES QUEDAS) -->
+  <h3 style="margin:24px 0 10px">Populares (Top 21 Maiores Quedas)</h3>
+  <div class="pop" id="pop-quedas"></div>
 </div>
 </div>
 
@@ -187,7 +192,7 @@ const BRAPI_TOKEN = "pXaqwKR2nR7gTXLabyzrys";
 const $ = id => document.getElementById(id);
 const BRL = v => (v || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
 const msg = t => $('msg').textContent = t || '';
-let uid = null, hold = [], favs = [], top21 = [], allStocks = [], charts = {}, unsubs = [], timer = null, cur = '', Q = {}, H = {}, fails = [];
+let uid = null, hold = [], favs = [], top21 = [], top21Quedas = [], allStocks = [], charts = {}, unsubs = [], timer = null, cur = '', Q = {}, H = {}, fails = [];
 
 try {
   const c = JSON.parse(localStorage.getItem('qcache2') || '{}');
@@ -329,7 +334,7 @@ function pickAc(ticker, isHold) {
 function closeAc() { $('s-ac').classList.add('hide'); $('h-ac').classList.add('hide'); }
 document.addEventListener('click', e => { if (!e.target.closest('.ac-wrap')) closeAc(); });
 
-/* ===== COTAÇÕES & TOP 21 ===== */
+/* ===== COTAÇÕES & TOP 21 (ALTAS E QUEDAS) ===== */
 const getTk = () => (BRAPI_TOKEN && BRAPI_TOKEN !== 'COLE_SEU_TOKEN_AQUI') ? BRAPI_TOKEN : '';
 
 async function quote(t, range = '1mo', interval = '1d') {
@@ -343,10 +348,21 @@ async function quote(t, range = '1mo', interval = '1d') {
 async function fetchTop21() {
   try {
     const tk = getTk();
-    const url = `https://brapi.dev/api/quote/list?sortBy=change&sortOrder=desc&limit=21&type=stock${tk ? '&token=' + encodeURIComponent(tk) : ''}`;
-    const r = await fetch(url), j = await r.json();
-    if (r.ok && j.stocks && j.stocks.length) {
-      top21 = j.stocks.map(s => {
+    // Maiores Altas
+    const r1 = await fetch(`https://brapi.dev/api/quote/list?sortBy=change&sortOrder=desc&limit=21&type=stock${tk ? '&token=' + encodeURIComponent(tk) : ''}`);
+    const j1 = await r1.json();
+    if (r1.ok && j1.stocks && j1.stocks.length) {
+      top21 = j1.stocks.map(s => {
+        Q[s.stock] = {price: s.close, chg: 0, pct: s.change, name: s.name || s.stock};
+        return s.stock;
+      });
+    }
+
+    // Maiores Quedas
+    const r2 = await fetch(`https://brapi.dev/api/quote/list?sortBy=change&sortOrder=asc&limit=21&type=stock${tk ? '&token=' + encodeURIComponent(tk) : ''}`);
+    const j2 = await r2.json();
+    if (r2.ok && j2.stocks && j2.stocks.length) {
+      top21Quedas = j2.stocks.map(s => {
         Q[s.stock] = {price: s.close, chg: 0, pct: s.change, name: s.name || s.stock};
         return s.stock;
       });
@@ -372,7 +388,7 @@ async function refresh() {
     ...favOnly.map(t => quote(t, '5d', '1d').then(d => Q[t] = slim(d)).catch(() => {}))
   ]);
   try { localStorage.setItem('qcache2', JSON.stringify({Q, H})); } catch (e) {}
-  renderFavs(); renderPop(); renderHold(); stamp();
+  renderFavs(); renderPop(); renderQuedas(); renderHold(); stamp();
   if (cur) search(true);
 }
 
@@ -446,6 +462,14 @@ async function search(silent) {
 function renderPop() {
   const list = top21.length ? top21 : ['PETR4','VALE3','ITUB4','BBDC4','TAEE11','WEGE3','BBAS3','ABEV3'];
   $('pop').innerHTML = list.map(t => {
+    const d = Q[t], p = d ? d.pct || 0 : 0;
+    return `<div class="card" onclick="$('s-q').value='${t}';search()"><b>${t}</b><br>${d ? BRL(d.price) + `<br><span class="${p >= 0 ? 'up' : 'dn'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</span>` : '<small style="color:var(--mu)">carregando...</small>'}</div>`;
+  }).join('');
+}
+
+function renderQuedas() {
+  const list = top21Quedas.length ? top21Quedas : ['PETR4','VALE3','ITUB4','BBDC4','TAEE11','WEGE3','BBAS3','ABEV3'];
+  $('pop-quedas').innerHTML = list.map(t => {
     const d = Q[t], p = d ? d.pct || 0 : 0;
     return `<div class="card" onclick="$('s-q').value='${t}';search()"><b>${t}</b><br>${d ? BRL(d.price) + `<br><span class="${p >= 0 ? 'up' : 'dn'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</span>` : '<small style="color:var(--mu)">carregando...</small>'}</div>`;
   }).join('');
