@@ -45,7 +45,8 @@ nav .on{color:var(--em);border-color:var(--em);font-weight:600}
 .kpi small{color:var(--mu);font-size:12px}.kpi b{display:block;font-size:20px;margin-top:4px}
 .up{color:var(--em)}.dn{color:var(--rd)}
 .row{display:flex;gap:10px;flex-wrap:wrap}.row input{margin:0;flex:1;min-width:120px}
-.cv{position:relative;height:240px}
+.cv{position:relative;height:160px} /* Altura reduzida para os gráficos individuais */
+.cv-pat{position:relative;height:240px} /* Altura original para o patrimônio geral */
 table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(--tx)}th{color:var(--mu);font-weight:500}
 .pop{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
@@ -53,8 +54,17 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(-
 .pop .card:hover{border-color:var(--em)}
 .pop .rm-fav{position:absolute;top:8px;right:8px;color:#ffffff;font-size:14px;cursor:pointer;background:none;border:none;padding:2px}
 .pop .rm-fav:hover{color:var(--rd)}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media(max-width:800px){.grid2{grid-template-columns:1fr}}
+
+/* GRADE DE 3 COLUNAS PARA OS GRÁFICOS DAS COTAS */
+.grid3{display:grid;grid-template-columns:repeat(3, 1fr);gap:16px}
+@media(max-width:900px){.grid3{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){.grid3{grid-template-columns:1fr}}
+
+/* ESTILIZAÇÃO DO CONTROLE [-[]+] NA TABELA */
+.qty-ctrl{display:inline-flex;align-items:center;gap:4px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:2px}
+.qty-ctrl button{background:transparent;color:var(--tx);border:none;width:24px;height:24px;font-weight:bold;cursor:pointer;border-radius:4px;display:flex;align-items:center;justify-content:center}
+.qty-ctrl button:hover{background:var(--bd);color:var(--em)}
+.qty-ctrl input{width:45px;background:transparent;border:none;color:var(--tx);text-align:center;font-size:13px;outline:none;margin:0;padding:0}
 
 /* AUTOCOMPLETE DROPDOWN */
 .ac-wrap{position:relative;flex:1;min-width:160px}
@@ -132,9 +142,9 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(-
     <div class="card kpi"><small>Resultado total</small><b id="p-res">R$ 0</b></div>
     <div class="card kpi"><small>Ativos</small><b id="p-n">0</b></div>
   </div>
-  <div class="card" id="pat-card"><h4 style="margin-bottom:10px">Evolução do patrimônio</h4><div class="cv"><canvas id="c-pat"></canvas></div></div>
-  <div class="card" style="overflow:auto"><table><thead><tr><th>Ação</th><th>Qtd</th><th>Preço médio</th><th>Atual</th><th>Dia</th><th>Total</th><th></th></tr></thead><tbody id="p-body"></tbody></table></div>
-  <div class="grid2" id="h-charts"></div>
+  <div class="card" id="pat-card"><h4 style="margin-bottom:10px">Evolução do patrimônio</h4><div class="cv-pat"><canvas id="c-pat"></canvas></div></div>
+  <div class="card" style="overflow:auto"><table><thead><tr><th>Ação</th><th>Qtd</th><th>Preço médio</th><th>Atual</th><th>Dia</th><th>Total</th><th style="text-align:right">Ações</th></tr></thead><tbody id="p-body"></tbody></table></div>
+  <div class="grid3" id="h-charts"></div>
 </div>
 
 <div class="pg hide" id="t-mercado">
@@ -164,7 +174,7 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(-
       <div><small>Abertura</small><br><b id="s-ab"></b></div><div><small>Máxima</small><br><b id="s-mx"></b></div>
       <div><small>Mínima</small><br><b id="s-mn"></b></div><div><small>Volume</small><br><b id="s-vol"></b></div>
     </div>
-    <div class="cv"><canvas id="c-stock"></canvas></div>
+    <div class="cv-pat"><canvas id="c-stock"></canvas></div>
     <small style="color:var(--mu)">Atualiza a cada 60 s. Passe o mouse no gráfico: data, preço e quanto subiu ou desceu.</small>
   </div>
 
@@ -271,7 +281,6 @@ function enter(u) {
   renderHold();
 
   unsubs.push(col('cotas').onSnapshot(s => {
-    // Só atualiza se o snapshot trouxer dados ou se estivermos garantindo o estado real
     hold = s.docs.map(d => ({id: d.id, ...d.data()}));
     try { localStorage.setItem('local_hold', JSON.stringify(hold)); } catch(e){}
     renderHold();
@@ -302,7 +311,7 @@ function tab(n, el) {
   Object.values(charts).forEach(c => c.resize());
 }
 
-/* ===== AUTOCOMPLETE INSTANTÂNEO ===== */
+/* ===== AUTOCOMPLETE INSTANTÂNEO & AUTO PREÇO MÉDIO ===== */
 async function fetchAllB3() {
   try {
     const tk = getTk();
@@ -323,6 +332,11 @@ async function fetchAllB3() {
 function filterAc(inputId, listId, isHold) {
   const val = $(inputId).value.trim().toUpperCase();
   const box = $(listId);
+  
+  if (isHold && val.length >= 4) {
+    autoFillPrice(val);
+  }
+
   if (!val) { box.classList.add('hide'); return; }
 
   const starts = allStocks.filter(s => s.t.startsWith(val));
@@ -343,9 +357,27 @@ function filterAc(inputId, listId, isHold) {
   box.classList.remove('hide');
 }
 
+async function autoFillPrice(ticker) {
+  try {
+    if (Q[ticker] && Q[ticker].price) {
+      $('h-p').value = Q[ticker].price.toFixed(2);
+      return;
+    }
+    const d = await quote(ticker, '1d', '1d');
+    if (d && d.regularMarketPrice) {
+      Q[ticker] = slim(d);
+      $('h-p').value = d.regularMarketPrice.toFixed(2);
+    }
+  } catch(e) {}
+}
+
 function pickAc(ticker, isHold) {
   closeAc();
-  if (isHold) { $('h-t').value = ticker; $('h-q').focus(); }
+  if (isHold) { 
+    $('h-t').value = ticker; 
+    autoFillPrice(ticker);
+    $('h-q').focus(); 
+  }
   else { $('s-q').value = ticker; search(); }
 }
 
@@ -501,14 +533,12 @@ function saveHold() {
   m.style.color = 'var(--em)'; 
   m.textContent = `${t} adicionada.`;
 
-  // Apaga a mensagem após 10 segundos
   msgTimer = setTimeout(() => {
     m.textContent = '';
   }, 10000);
 
   const novaCota = {t, q, p};
   col('cotas').add(novaCota).then(docRef => {
-    // Adiciona direto no array local imediatamente para evitar sumiço visual antes do snapshot
     novaCota.id = docRef.id;
     if (!hold.some(item => item.id === novaCota.id)) {
       hold.push(novaCota);
@@ -517,6 +547,30 @@ function saveHold() {
     }
   }).catch(e => {
     m.style.color = 'var(--rd)'; m.textContent = 'Erro ao salvar: ' + e.message;
+  });
+}
+
+function updateQty(id, delta) {
+  const item = hold.find(h => h.id === id);
+  if (!item) return;
+  let newQ = item.q + delta;
+  if (newQ < 1) newQ = 1;
+  item.q = newQ;
+  col('cotas').doc(id).update({q: newQ}).then(() => {
+    try { localStorage.setItem('local_hold', JSON.stringify(hold)); } catch(e){}
+    renderHold();
+  });
+}
+
+function setQty(id, val) {
+  const q = parseInt(val);
+  if (isNaN(q) || q < 1) return;
+  const item = hold.find(h => h.id === id);
+  if (!item || item.q === q) return;
+  item.q = q;
+  col('cotas').doc(id).update({q}).then(() => {
+    try { localStorage.setItem('local_hold', JSON.stringify(hold)); } catch(e){}
+    renderHold();
   });
 }
 
@@ -544,7 +598,24 @@ function renderHold() {
     $('p-body').innerHTML = hold.map(h => {
       const d = Q[h.t], c = d && d.price ? d.price : h.p, pc = d ? d.pct || 0 : 0;
       const v = c * h.q; tot += v; dia += v * pc / 100 / (1 + pc / 100); res += (c - h.p) * h.q;
-      return `<tr><td><b>${h.t}</b><br><small style="color:var(--mu)">${d ? d.name : ''}</small></td><td>${h.q}</td><td>${BRL(h.p)}</td><td>${BRL(c)}</td><td class="${pc >= 0 ? 'up' : 'dn'}">${pc >= 0 ? '+' : ''}${pc.toFixed(2)}%</td><td>${BRL(v)}</td><td><button class="g" onclick="rmHold('${h.id}')">✕</button></td></tr>`;
+      return `<tr>
+        <td><b>${h.t}</b><br><small style="color:var(--mu)">${d ? d.name : ''}</small></td>
+        <td>${h.q}</td>
+        <td>${BRL(h.p)}</td>
+        <td>${BRL(c)}</td>
+        <td class="${pc >= 0 ? 'up' : 'dn'}">${pc >= 0 ? '+' : ''}${pc.toFixed(2)}%</td>
+        <td>${BRL(v)}</td>
+        <td style="text-align:right">
+          <div style="display:inline-flex;align-items:center;gap:8px">
+            <button class="g" onclick="rmHold('${h.id}')" title="Excluir">✕</button>
+            <div class="qty-ctrl">
+              <button onclick="updateQty('${h.id}', -1)">-</button>
+              <input type="number" min="1" value="${h.q}" onchange="setQty('${h.id}', this.value)">
+              <button onclick="updateQty('${h.id}', 1)">+</button>
+            </div>
+          </div>
+        </td>
+      </tr>`;
     }).join('') || '<tr><td colspan="7" style="color:var(--mu)">Nenhuma cota adicionada ainda.</td></tr>';
     $('p-tot').textContent = BRL(tot); $('p-dia').textContent = BRL(dia); $('p-dia').className = dia >= 0 ? 'up' : 'dn';
     $('p-res').textContent = BRL(res); $('p-res').className = res >= 0 ? 'up' : 'dn'; $('p-n').textContent = hold.length;
