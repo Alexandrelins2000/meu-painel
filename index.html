@@ -132,7 +132,7 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd)}th{color:va
       <div><small>Mínima</small><br><b id="s-mn"></b></div><div><small>Volume</small><br><b id="s-vol"></b></div>
     </div>
     <div class="cv"><canvas id="c-stock"></canvas></div>
-    <small style="color:var(--mu)">Atualiza a cada 60 s. Passe o mouse no gráfico: horário, preço e quanto subiu ou desceu.</small>
+    <small style="color:var(--mu)">Atualiza a cada 60 s. Passe o mouse no gráfico: data, preço e quanto subiu ou desceu.</small>
   </div>
   <h3 style="margin:18px 0 10px">Populares</h3><div class="pop" id="pop"></div>
 </div>
@@ -217,9 +217,9 @@ function tab(n, el) {
   Object.values(charts).forEach(c => c.resize());
 }
 
-/* ===== COTAÇÕES (brapi.dev) ===== */
+/* ===== COTAÇÕES (brapi.dev - Plano Gratuito: interval=1d) ===== */
 const POP = ['PETR4','VALE3','ITUB4','BBDC4','TAEE11','WEGE3','BBAS3','ABEV3'];
-async function quote(t, range = '1d', interval = '15m') {
+async function quote(t, range = '1mo', interval = '1d') {
   const tk = (BRAPI_TOKEN && BRAPI_TOKEN !== 'COLE_SEU_TOKEN_AQUI') ? BRAPI_TOKEN : '';
   const url = `https://brapi.dev/api/quote/${encodeURIComponent(t)}?range=${range}&interval=${interval}${tk ? '&token=' + encodeURIComponent(tk) : ''}`;
   const r = await fetch(url), j = await r.json();
@@ -229,8 +229,7 @@ async function quote(t, range = '1d', interval = '15m') {
 const slim = d => ({price:d.regularMarketPrice, chg:d.regularMarketChange, pct:d.regularMarketChangePercent, name:d.shortName || d.longName || ''});
 const hist = d => (d.historicalDataPrice || []).filter(x => x.close != null).map(x => ({t:x.date * 1000, c:x.close}));
 async function loadHold(t) {
-  let d = await quote(t, '1d', '15m'), pts = hist(d);
-  if (pts.length < 2) { d = await quote(t, '5d', '1h'); pts = hist(d); }
+  const d = await quote(t, '1mo', '1d'), pts = hist(d);
   Q[t] = slim(d); if (pts.length) H[t] = pts;
 }
 async function refresh() {
@@ -238,7 +237,7 @@ async function refresh() {
   fails = [];
   await Promise.all([
     ...mine.map(t => loadHold(t).catch(() => fails.push(t))),
-    ...POP.filter(t => !mine.includes(t)).map(t => quote(t, '1d', '1h').then(d => Q[t] = slim(d)).catch(() => {}))
+    ...POP.filter(t => !mine.includes(t)).map(t => quote(t, '5d', '1d').then(d => Q[t] = slim(d)).catch(() => {}))
   ]);
   try { localStorage.setItem('qcache2', JSON.stringify({Q, H})); } catch (e) {}
   renderPop(); renderHold(); stamp();
@@ -253,21 +252,20 @@ function lineChart(key, canvasId, labels, data, fmt) {
     c.data.datasets[0].borderColor = cor; c.data.datasets[0].backgroundColor = cor + '22'; c.update('none'); return;
   }
   charts[key] = new Chart($(canvasId).getContext('2d'), {type:'line',
-    data:{labels, datasets:[{data, borderColor:cor, backgroundColor:cor + '22', fill:true, tension:.25, pointRadius:1.5}]},
+    data:{labels, datasets:[{data, borderColor:cor, backgroundColor:cor + '22', fill:true, tension:.25, pointRadius:2}]},
     options:{responsive:true, maintainAspectRatio:false, animation:false, plugins:{legend:{display:false}, tooltip:{callbacks:{
-      title: c => 'Horário: ' + c[0].label,
+      title: c => 'Data: ' + c[0].label,
       label: c => {
         const a = c.dataset.data, i = c.dataIndex, prev = i ? a[i-1] : a[0], df = c.raw - prev, pc = prev ? df / prev * 100 : 0;
-        return [`${fmt}: ${BRL(c.raw)}`, `vs. ponto anterior: ${df >= 0 ? '+' : ''}${df.toFixed(2)} (${pc.toFixed(2)}%)`, `vs. início: ${((c.raw / a[0] - 1) * 100).toFixed(2)}%`];
+        return [`${fmt}: ${BRL(c.raw)}`, `vs. dia anterior: ${df >= 0 ? '+' : ''}${df.toFixed(2)} (${pc.toFixed(2)}%)`, `vs. início: ${((c.raw / a[0] - 1) * 100).toFixed(2)}%`];
       }}}}}});
 }
-const fmtT = ms => new Date(ms).toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+const fmtT = ms => new Date(ms).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
 async function search(silent) {
   const t = silent === true ? cur : $('s-q').value.trim().toUpperCase(); if (!t) return;
   cur = t; if (silent !== true) $('s-msg').textContent = 'Buscando...';
   try {
-    let d = await quote(t), h = hist(d);
-    if (h.length < 2) { d = await quote(t, '5d', '1h'); h = hist(d); }
+    const d = await quote(t, '1mo', '1d'), h = hist(d);
     $('s-msg').textContent = ''; $('s-res').classList.remove('hide');
     $('s-nome').textContent = d.longName || d.shortName || t; $('s-tick').textContent = d.symbol;
     $('s-preco').textContent = BRL(d.regularMarketPrice);
