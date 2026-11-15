@@ -3,9 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Emerald Night</title>
+<title>ALFbroker</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
@@ -21,8 +20,8 @@ body{background:var(--bg);color:var(--tx);min-height:100vh}
 .sub{text-align:center;color:var(--mu);font-size:14px;margin-bottom:18px}
 input{width:100%;padding:10px 12px;margin-bottom:12px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;color:var(--tx);font-size:14px;outline:none}
 input:focus{border-color:var(--em)}
-button,.b{padding:10px 14px;background:var(--em);color:#fff;border:0;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;display:inline-block}
-button:hover,.b:hover{background:var(--emd)}
+button{padding:10px 14px;background:var(--em);color:#fff;border:0;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px}
+button:hover{background:var(--emd)}
 .w{width:100%}
 .g{background:transparent;border:1px solid var(--bd);color:var(--mu)}
 .g:hover{background:transparent;border-color:var(--em);color:var(--em)}
@@ -42,14 +41,12 @@ nav .on{color:var(--em);border-color:var(--em);font-weight:600}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:16px}
 .kpi small{color:var(--mu);font-size:12px}.kpi b{display:block;font-size:20px;margin-top:4px}
 .up{color:var(--em)}.dn{color:var(--rd)}
-.row{display:flex;gap:10px;flex-wrap:wrap}.row input{margin:0;flex:1}
-.cv{position:relative;height:260px}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row input{margin:0;flex:1;min-width:120px}
+.cv{position:relative;height:240px}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd)}th{color:var(--mu);font-weight:500}
 .pop{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .pop .card{cursor:pointer;margin:0;padding:12px}
-.ov{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:9;padding:16px}
-.ov .box{max-height:90vh;overflow:auto}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:800px){.grid2{grid-template-columns:1fr}}
 </style>
@@ -57,7 +54,7 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd)}th{color:va
 <body data-theme="dark">
 
 <div id="auth" class="auth"><div class="box">
-  <h1>Emerald Night</h1>
+  <h1>ALFbroker</h1>
   <div id="v-login">
     <p class="sub">Acesse sua conta</p>
     <button class="w" onclick="googleLogin()">Entrar com Google</button>
@@ -87,18 +84,39 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd)}th{color:va
 
 <div id="app" class="hide">
 <header>
-  <div class="logo"><span>Emerald</span> Night</div>
+  <div class="logo"><span>ALF</span>broker</div>
   <div class="hr"><span class="live" id="live">● conectando...</span><span id="who"></span>
     <button class="g" onclick="toggleTheme()">🌗 Tema</button>
     <button class="g" onclick="auth.signOut()">Sair</button></div>
 </header>
 <nav>
-  <div class="on" onclick="tab('mercado',this)">Mercado / Ações</div>
-  <div onclick="tab('carteira',this)">Minha Carteira</div>
-  <div onclick="tab('vendas',this)">Vendas</div>
+  <div class="on" onclick="tab('carteira',this)">Minha Carteira</div>
+  <div onclick="tab('mercado',this)">Mercado / Ações</div>
 </nav>
 
-<div class="pg" id="t-mercado">
+<div class="pg" id="t-carteira">
+  <div class="card">
+    <h4 style="margin-bottom:12px">Adicionar cota</h4>
+    <div class="row">
+      <input id="h-t" placeholder="Ticker (ex: TAEE11)" autocomplete="off">
+      <input id="h-q" type="number" min="1" placeholder="Quantidade">
+      <input id="h-p" type="number" step="0.01" min="0" placeholder="Preço médio (R$)" onkeydown="if(event.key==='Enter')saveHold()">
+      <button onclick="saveHold()">Adicionar</button>
+    </div>
+    <div class="msg" id="h-msg" style="text-align:left"></div>
+  </div>
+  <div class="kpis">
+    <div class="card kpi"><small>Patrimônio</small><b id="p-tot">R$ 0</b></div>
+    <div class="card kpi"><small>Resultado do dia</small><b id="p-dia">R$ 0</b></div>
+    <div class="card kpi"><small>Resultado total</small><b id="p-res">R$ 0</b></div>
+    <div class="card kpi"><small>Ativos</small><b id="p-n">0</b></div>
+  </div>
+  <div class="card" id="pat-card"><h4 style="margin-bottom:10px">Evolução do patrimônio</h4><div class="cv"><canvas id="c-pat"></canvas></div></div>
+  <div class="card" style="overflow:auto"><table><thead><tr><th>Ação</th><th>Qtd</th><th>Preço médio</th><th>Atual</th><th>Dia</th><th>Total</th><th></th></tr></thead><tbody id="p-body"></tbody></table></div>
+  <div class="grid2" id="h-charts"></div>
+</div>
+
+<div class="pg hide" id="t-mercado">
   <div class="row" style="margin-bottom:10px">
     <input id="s-q" placeholder="Pesquisar ação: TAEE11, PETR4, VALE3..." onkeydown="if(event.key==='Enter')search()">
     <button onclick="search()">Buscar</button>
@@ -115,57 +133,18 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd)}th{color:va
       <div><small>Mínima</small><br><b id="s-mn"></b></div><div><small>Volume</small><br><b id="s-vol"></b></div>
     </div>
     <div class="cv"><canvas id="c-stock"></canvas></div>
-    <small style="color:var(--mu)">Atualiza sozinho a cada 60 s. Passe o mouse no gráfico: horário, preço e quanto subiu ou desceu.</small>
+    <small style="color:var(--mu)">Atualiza a cada 60 s. Passe o mouse no gráfico: horário, preço e quanto subiu ou desceu.</small>
   </div>
   <h3 style="margin:18px 0 10px">Populares</h3><div class="pop" id="pop"></div>
 </div>
-
-<div class="pg hide" id="t-carteira">
-  <div style="display:flex;justify-content:space-between;margin-bottom:14px"><h2>Minha carteira</h2><button onclick="openM('m-hold')">+ Adicionar cota</button></div>
-  <div class="kpis">
-    <div class="card kpi"><small>Patrimônio</small><b id="p-tot">R$ 0</b></div>
-    <div class="card kpi"><small>Resultado do dia</small><b id="p-dia">R$ 0</b></div>
-    <div class="card kpi"><small>Resultado total</small><b id="p-res">R$ 0</b></div>
-    <div class="card kpi"><small>Ativos</small><b id="p-n">0</b></div>
-  </div>
-  <div class="card" style="overflow:auto"><table><thead><tr><th>Ação</th><th>Qtd</th><th>Preço médio</th><th>Atual</th><th>Dia</th><th>Total</th><th></th></tr></thead><tbody id="p-body"></tbody></table></div>
 </div>
-
-<div class="pg hide" id="t-vendas">
-  <div class="row" style="margin-bottom:16px">
-    <label class="b">📂 Importar Excel/CSV<input type="file" accept=".xlsx,.xls,.csv" hidden onchange="importFile(event)"></label>
-    <button class="g" onclick="openM('m-sale')">+ Venda manual</button>
-    <button class="g" onclick="clearSales()">Limpar vendas</button>
-  </div>
-  <div class="kpis">
-    <div class="card kpi"><small>Faturamento</small><b id="k-fat">R$ 0</b></div>
-    <div class="card kpi"><small>Quantidade</small><b id="k-qtd">0</b></div>
-    <div class="card kpi"><small>Ticket médio</small><b id="k-tic">R$ 0</b></div>
-    <div class="card kpi"><small>Nº de vendas</small><b id="k-n">0</b></div>
-  </div>
-  <div class="card"><h4>Faturamento por mês</h4><div class="cv"><canvas id="c-mes"></canvas></div></div>
-  <div class="grid2">
-    <div class="card"><h4>Por região</h4><div class="cv"><canvas id="c-reg"></canvas></div></div>
-    <div class="card"><h4>Ranking de vendedores</h4><div class="cv"><canvas id="c-ven"></canvas></div></div>
-  </div>
-  <p style="color:var(--mu);font-size:12px">Colunas do arquivo: Data, Regiao, Vendedor, Produto, Categoria, Quantidade, Valor_Total</p>
-</div>
-</div>
-
-<div class="ov" id="m-sale"><div class="box"><h3 style="margin-bottom:14px">Nova venda</h3>
-  <input id="v-data" type="date"><input id="v-regiao" placeholder="Região"><input id="v-vend" placeholder="Vendedor">
-  <input id="v-prod" placeholder="Produto"><input id="v-cat" placeholder="Categoria">
-  <input id="v-qtd" type="number" min="1" value="1"><input id="v-val" type="number" step="0.01" placeholder="Valor total (R$)">
-  <div class="row"><button class="g w" onclick="closeM('m-sale')">Cancelar</button><button class="w" onclick="saveSale()">Salvar</button></div></div></div>
-<div class="ov" id="m-hold"><div class="box"><h3 style="margin-bottom:14px">Adicionar cota</h3>
-  <input id="h-t" placeholder="Ticker (ex: TAEE11)"><input id="h-q" type="number" min="1" placeholder="Quantidade"><input id="h-p" type="number" step="0.01" placeholder="Preço médio (R$)">
-  <div class="row"><button class="g w" onclick="closeM('m-hold')">Cancelar</button><button class="w" onclick="saveHold()">Adicionar</button></div></div></div>
 
 <script>
 const $ = id => document.getElementById(id);
 const BRL = v => (v || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
 const msg = t => $('msg').textContent = t || '';
-let uid = null, sales = [], hold = [], charts = {}, unsubs = [], timer = null, cur = '', Q = {};
+let uid = null, hold = [], charts = {}, unsubs = [], timer = null, cur = '', Q = {}, H = {}, fails = [];
+try { const c = JSON.parse(localStorage.getItem('qcache2') || '{}'); Q = c.Q || {}; H = c.H || {}; } catch (e) {}
 
 const firebaseConfig = {
   apiKey: "AIzaSyAvEOf4i-2CZ5Xut0AfGdjjhUpUNjac20Q",
@@ -175,14 +154,13 @@ const firebaseConfig = {
   messagingSenderId: "566444089182",
   appId: "1:566444089182:web:be0cdfcd8edd76327f39cf"
 };
-if (!window.firebase) { document.addEventListener('DOMContentLoaded', () => msg('Firebase não carregou. Abra no Chrome/Edge com internet, fora de pré-visualizações.')); }
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth(), db = firebase.firestore();
 const col = n => db.collection('users').doc(uid).collection(n);
 
 /* ===== AUTH ===== */
 function show(id) { ['v-login','v-reg','v-verify'].forEach(i => $(i).classList.toggle('hide', i !== id)); msg(); }
-const errs = {'auth/invalid-credential':'E-mail ou senha incorretos','auth/email-already-in-use':'E-mail já cadastrado','auth/weak-password':'Senha muito fraca','auth/invalid-email':'E-mail inválido','auth/popup-closed-by-user':'Login cancelado','auth/unauthorized-domain':'Domínio não autorizado: adicione-o em Authentication → Settings → Authorized domains','auth/operation-not-allowed':'Ative este método em Authentication → Sign-in method','auth/operation-not-supported-in-this-environment':'Abra pelo link do GitHub Pages (não funciona em arquivo local)'};
+const errs = {'auth/invalid-credential':'E-mail ou senha incorretos','auth/email-already-in-use':'E-mail já cadastrado','auth/weak-password':'Senha muito fraca','auth/invalid-email':'E-mail inválido','auth/popup-closed-by-user':'Login cancelado','auth/unauthorized-domain':'Domínio não autorizado no Firebase'};
 const fail = e => msg(errs[e.code] || e.message);
 function googleLogin() { auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(fail); }
 function emailLogin() { auth.signInWithEmailAndPassword($('l-email').value.trim(), $('l-pass').value).catch(fail); }
@@ -204,7 +182,7 @@ auth.onAuthStateChanged(u => {
   enter(u);
 });
 function leave() {
-  unsubs.forEach(f => f()); unsubs = []; clearInterval(timer); uid = null; sales = []; hold = [];
+  unsubs.forEach(f => f()); unsubs = []; clearInterval(timer); uid = null; hold = [];
   $('app').classList.add('hide'); $('auth').style.display = 'flex'; show('v-login');
 }
 
@@ -214,19 +192,26 @@ function enter(u) {
   uid = u.uid; $('auth').style.display = 'none'; $('app').classList.remove('hide');
   $('who').textContent = u.displayName || u.email; $('s-token').value = localStorage.getItem('brapi') || '';
   const err = e => { $('live').textContent = '● erro: ' + (e.code === 'permission-denied' ? 'confira as regras do Firestore' : e.message); $('live').style.color = 'var(--rd)'; };
-  unsubs.push(col('cotas').onSnapshot(s => { hold = s.docs.map(d => ({id: d.id, ...d.data()})); renderHold(); refresh(); }, err));
-  unsubs.push(col('vendas').onSnapshot(s => { sales = s.docs.map(d => { const x = d.data(); return {id: d.id, ...x, Data: new Date(x.Data)}; }); renderSales(); }, err));
-  renderPop(); refresh(); timer = setInterval(refresh, 60000);
+  let first = true;
+  unsubs.push(col('cotas').onSnapshot(s => {
+    hold = s.docs.map(d => ({id: d.id, ...d.data()}));
+    renderHold();
+    if (first || hold.some(h => !H[h.t])) refresh();
+    first = false;
+  }, err));
+  renderPop(); timer = setInterval(refresh, 60000);
 }
-const stamp = () => { $('live').textContent = '● ao vivo · ' + new Date().toLocaleTimeString('pt-BR'); $('live').style.color = ''; };
-
+function stamp() {
+  const l = $('live');
+  l.textContent = '● ao vivo · ' + new Date().toLocaleTimeString('pt-BR') + (fails.length ? ' · sem cotação: ' + fails.join(', ') : '');
+  l.style.color = fails.length ? 'var(--mu)' : '';
+}
 function toggleTheme() { const b = document.body; b.dataset.theme = b.dataset.theme === 'dark' ? 'light' : 'dark'; }
 function tab(n, el) {
   document.querySelectorAll('nav div').forEach(d => d.classList.remove('on')); el.classList.add('on');
-  ['mercado','carteira','vendas'].forEach(t => $('t-' + t).classList.toggle('hide', t !== n));
+  ['carteira','mercado'].forEach(t => $('t-' + t).classList.toggle('hide', t !== n));
+  Object.values(charts).forEach(c => c.resize());
 }
-const openM = id => { $(id).style.display = 'flex'; if (id === 'm-sale') $('v-data').value = new Date().toISOString().slice(0, 10); };
-const closeM = id => $(id).style.display = 'none';
 
 /* ===== COTAÇÕES (brapi.dev) ===== */
 const POP = ['PETR4','VALE3','ITUB4','BBDC4','TAEE11','WEGE3','BBAS3','ABEV3'];
@@ -237,18 +222,48 @@ async function quote(t, range = '1d', interval = '15m') {
   if (!r.ok || !j.results || !j.results[0]) throw new Error(j.message || 'Ação não encontrada (ou token necessário)');
   return j.results[0];
 }
+const slim = d => ({price:d.regularMarketPrice, chg:d.regularMarketChange, pct:d.regularMarketChangePercent, name:d.shortName || d.longName || ''});
+const hist = d => (d.historicalDataPrice || []).filter(x => x.close != null).map(x => ({t:x.date * 1000, c:x.close}));
+async function loadHold(t) {
+  let d = await quote(t, '1d', '15m'), pts = hist(d);
+  if (pts.length < 2) { d = await quote(t, '5d', '1h'); pts = hist(d); }
+  Q[t] = slim(d); if (pts.length) H[t] = pts;
+}
 async function refresh() {
-  const ts = [...new Set([...POP, ...hold.map(h => h.t)])];
-  await Promise.allSettled(ts.map(t => quote(t, '1d', '1h').then(d => Q[t] = d)));
+  const mine = [...new Set(hold.map(h => h.t))];
+  fails = [];
+  await Promise.all([
+    ...mine.map(t => loadHold(t).catch(() => fails.push(t))),
+    ...POP.filter(t => !mine.includes(t)).map(t => quote(t, '1d', '1h').then(d => Q[t] = slim(d)).catch(() => {}))
+  ]);
+  try { localStorage.setItem('qcache2', JSON.stringify({Q, H})); } catch (e) {}
   renderPop(); renderHold(); stamp();
   if (cur) search(true);
 }
+
+/* ===== MERCADO ===== */
+function lineChart(key, canvasId, labels, data, fmt) {
+  const up = data.length < 2 || data[data.length - 1] >= data[0], cor = up ? '#10b981' : '#ef4444';
+  if (charts[key]) {
+    const c = charts[key]; c.data.labels = labels; c.data.datasets[0].data = data;
+    c.data.datasets[0].borderColor = cor; c.data.datasets[0].backgroundColor = cor + '22'; c.update('none'); return;
+  }
+  charts[key] = new Chart($(canvasId).getContext('2d'), {type:'line',
+    data:{labels, datasets:[{data, borderColor:cor, backgroundColor:cor + '22', fill:true, tension:.25, pointRadius:1.5}]},
+    options:{responsive:true, maintainAspectRatio:false, animation:false, plugins:{legend:{display:false}, tooltip:{callbacks:{
+      title: c => 'Horário: ' + c[0].label,
+      label: c => {
+        const a = c.dataset.data, i = c.dataIndex, prev = i ? a[i-1] : a[0], df = c.raw - prev, pc = prev ? df / prev * 100 : 0;
+        return [`${fmt}: ${BRL(c.raw)}`, `vs. ponto anterior: ${df >= 0 ? '+' : ''}${df.toFixed(2)} (${pc.toFixed(2)}%)`, `vs. início: ${((c.raw / a[0] - 1) * 100).toFixed(2)}%`];
+      }}}}}});
+}
+const fmtT = ms => new Date(ms).toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
 async function search(silent) {
   const t = silent === true ? cur : $('s-q').value.trim().toUpperCase(); if (!t) return;
   cur = t; if (silent !== true) $('s-msg').textContent = 'Buscando...';
   try {
-    let d = await quote(t);
-    if (!d.historicalDataPrice || d.historicalDataPrice.length < 2) d = await quote(t, '5d', '1h');
+    let d = await quote(t), h = hist(d);
+    if (h.length < 2) { d = await quote(t, '5d', '1h'); h = hist(d); }
     $('s-msg').textContent = ''; $('s-res').classList.remove('hide');
     $('s-nome').textContent = d.longName || d.shortName || t; $('s-tick').textContent = d.symbol;
     $('s-preco').textContent = BRL(d.regularMarketPrice);
@@ -257,86 +272,59 @@ async function search(silent) {
     $('s-var').className = p >= 0 ? 'up' : 'dn';
     $('s-ab').textContent = BRL(d.regularMarketOpen); $('s-mx').textContent = BRL(d.regularMarketDayHigh);
     $('s-mn').textContent = BRL(d.regularMarketDayLow); $('s-vol').textContent = (d.regularMarketVolume || 0).toLocaleString('pt-BR');
-    const h = (d.historicalDataPrice || []).filter(x => x.close != null);
-    const lb = h.map(x => new Date(x.date * 1000).toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}));
-    const pr = h.map(x => x.close), cor = p >= 0 ? '#10b981' : '#ef4444';
-    if (charts.s) charts.s.destroy();
-    charts.s = new Chart($('c-stock').getContext('2d'), {type:'line',
-      data:{labels:lb, datasets:[{data:pr, borderColor:cor, backgroundColor:cor + '22', fill:true, tension:.25, pointRadius:2}]},
-      options:{responsive:true, maintainAspectRatio:false, animation:false, plugins:{legend:{display:false}, tooltip:{callbacks:{
-        title: c => 'Horário: ' + c[0].label,
-        label: c => {
-          const i = c.dataIndex, prev = i ? pr[i-1] : pr[0], df = c.raw - prev, pc = prev ? df / prev * 100 : 0;
-          return [`Preço: ${BRL(c.raw)}`, `vs. ponto anterior: ${df >= 0 ? '+' : ''}${df.toFixed(2)} (${pc.toFixed(2)}%)`, `vs. início: ${((c.raw / pr[0] - 1) * 100).toFixed(2)}%`];
-        }}}}}});
-  } catch (e) { $('s-msg').textContent = e.message; }
+    lineChart('stock', 'c-stock', h.map(x => fmtT(x.t)), h.map(x => x.c), 'Preço');
+  } catch (e) { if (silent !== true) $('s-msg').textContent = e.message; }
 }
 function renderPop() {
   $('pop').innerHTML = POP.map(t => {
-    const d = Q[t], p = d ? d.regularMarketChangePercent || 0 : 0;
-    return `<div class="card" onclick="$('s-q').value='${t}';search()"><b>${t}</b><br>${d ? BRL(d.regularMarketPrice) + `<br><span class="${p >= 0 ? 'up' : 'dn'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</span>` : '<small style="color:var(--mu)">carregando...</small>'}</div>`;
+    const d = Q[t], p = d ? d.pct || 0 : 0;
+    return `<div class="card" onclick="$('s-q').value='${t}';search()"><b>${t}</b><br>${d ? BRL(d.price) + `<br><span class="${p >= 0 ? 'up' : 'dn'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</span>` : '<small style="color:var(--mu)">carregando...</small>'}</div>`;
   }).join('');
 }
 
 /* ===== CARTEIRA ===== */
 function saveHold() {
-  const t = $('h-t').value.trim().toUpperCase(), q = +$('h-q').value, p = +$('h-p').value;
-  if (!t || q <= 0 || p <= 0) return alert('Preencha corretamente');
-  col('cotas').add({t, q, p}).then(() => { closeM('m-hold'); $('h-t').value = $('h-q').value = $('h-p').value = ''; }).catch(e => alert(e.message));
+  const t = $('h-t').value.trim().toUpperCase(), q = +$('h-q').value, p = +$('h-p').value, m = $('h-msg');
+  if (!t || !(q > 0) || !(p > 0)) { m.style.color = 'var(--rd)'; m.textContent = 'Preencha ticker, quantidade e preço médio.'; return; }
+  $('h-t').value = $('h-q').value = $('h-p').value = ''; $('h-t').focus();
+  m.style.color = 'var(--em)'; m.textContent = `${t} adicionada. Pode inserir a próxima.`;
+  col('cotas').add({t, q, p}).catch(e => { m.style.color = 'var(--rd)'; m.textContent = 'Erro ao salvar ' + t + ': ' + e.message; });
 }
-function rmHold(id) { col('cotas').doc(id).delete(); }
+function rmHold(id) { if (confirm('Remover esta cota?')) col('cotas').doc(id).delete(); }
+const priceAt = (t, time) => {
+  const a = H[t]; if (!a || !a.length) return null;
+  let v = a[0].c; for (const x of a) { if (x.t <= time) v = x.c; else break; } return v;
+};
 function renderHold() {
-  let tot = 0, dia = 0, res = 0;
-  $('p-body').innerHTML = hold.map(h => {
-    const d = Q[h.t], c = d ? d.regularMarketPrice : h.p, pc = d ? d.regularMarketChangePercent || 0 : 0;
-    const v = c * h.q; tot += v; dia += v * pc / 100 / (1 + pc / 100); res += (c - h.p) * h.q;
-    return `<tr><td><b>${h.t}</b><br><small style="color:var(--mu)">${d ? d.shortName || '' : ''}</small></td><td>${h.q}</td><td>${BRL(h.p)}</td><td>${BRL(c)}</td><td class="${pc >= 0 ? 'up' : 'dn'}">${pc >= 0 ? '+' : ''}${pc.toFixed(2)}%</td><td>${BRL(v)}</td><td><button class="g" onclick="rmHold('${h.id}')">✕</button></td></tr>`;
-  }).join('');
-  $('p-tot').textContent = BRL(tot); $('p-dia').textContent = BRL(dia); $('p-dia').className = dia >= 0 ? 'up' : 'dn';
-  $('p-res').textContent = BRL(res); $('p-res').className = res >= 0 ? 'up' : 'dn'; $('p-n').textContent = hold.length;
+  try {
+    let tot = 0, dia = 0, res = 0;
+    $('p-body').innerHTML = hold.map(h => {
+      const d = Q[h.t], c = d && d.price ? d.price : h.p, pc = d ? d.pct || 0 : 0;
+      const v = c * h.q; tot += v; dia += v * pc / 100 / (1 + pc / 100); res += (c - h.p) * h.q;
+      return `<tr><td><b>${h.t}</b><br><small style="color:var(--mu)">${d ? d.name : ''}</small></td><td>${h.q}</td><td>${BRL(h.p)}</td><td>${BRL(c)}</td><td class="${pc >= 0 ? 'up' : 'dn'}">${pc >= 0 ? '+' : ''}${pc.toFixed(2)}%</td><td>${BRL(v)}</td><td><button class="g" onclick="rmHold('${h.id}')">✕</button></td></tr>`;
+    }).join('') || '<tr><td colspan="7" style="color:var(--mu)">Nenhuma cota adicionada ainda.</td></tr>';
+    $('p-tot').textContent = BRL(tot); $('p-dia').textContent = BRL(dia); $('p-dia').className = dia >= 0 ? 'up' : 'dn';
+    $('p-res').textContent = BRL(res); $('p-res').className = res >= 0 ? 'up' : 'dn'; $('p-n').textContent = hold.length;
+    renderPortCharts();
+  } catch (e) { console.error(e); }
 }
-
-/* ===== VENDAS ===== */
-function parseDate(v) { if (!v) return null; if (typeof v === 'number') return new Date((v - 25569) * 864e5); const d = new Date(v); return isNaN(d) ? null : d; }
-async function batchRun(items, fn) {
-  for (let i = 0; i < items.length; i += 400) {
-    const b = db.batch(); items.slice(i, i + 400).forEach(x => fn(b, x)); await b.commit();
+function renderPortCharts() {
+  const ts = [...new Set(hold.map(h => h.t))], wrap = $('h-charts'), sig = ts.join(',');
+  $('pat-card').classList.toggle('hide', !ts.length);
+  if (wrap.dataset.sig !== sig) {
+    Object.keys(charts).filter(k => k.startsWith('h:')).forEach(k => { charts[k].destroy(); delete charts[k]; });
+    wrap.innerHTML = ts.map((t, i) => `<div class="card"><h4 style="margin-bottom:10px">${t}</h4><div class="cv"><canvas id="ch-${i}"></canvas></div></div>`).join('');
+    wrap.dataset.sig = sig;
   }
-}
-function importFile(e) {
-  const f = e.target.files[0]; if (!f) return; const r = new FileReader();
-  r.onload = ev => {
-    const wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
-    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-    const g = (o, ...ks) => { for (const k of ks) if (o[k] !== undefined) return o[k]; return ''; };
-    const n = rows.map(o => ({Data:parseDate(g(o,'Data','data')), Regiao:g(o,'Regiao','Região','regiao'), Vendedor:g(o,'Vendedor','vendedor'),
-      Produto:g(o,'Produto','produto'), Categoria:g(o,'Categoria','categoria'), Quantidade:+g(o,'Quantidade','quantidade') || 0,
-      Valor_Total:+g(o,'Valor_Total','valor_total','Valor Total') || 0})).filter(r => r.Data && r.Valor_Total > 0);
-    if (!n.length) return alert('Nenhum dado válido. Verifique as colunas.');
-    batchRun(n, (b, x) => b.set(col('vendas').doc(), {...x, Data: x.Data.toISOString()})).catch(e => alert(e.message));
-  };
-  r.readAsArrayBuffer(f); e.target.value = '';
-}
-function saveSale() {
-  const s = {Data:new Date($('v-data').value + 'T12:00:00').toISOString(), Regiao:$('v-regiao').value || 'N/I', Vendedor:$('v-vend').value || 'N/I',
-    Produto:$('v-prod').value || 'N/I', Categoria:$('v-cat').value || 'Geral', Quantidade:+$('v-qtd').value || 1, Valor_Total:+$('v-val').value};
-  if (!(s.Valor_Total > 0)) return alert('Informe o valor total');
-  col('vendas').add(s).then(() => closeM('m-sale')).catch(e => alert(e.message));
-}
-function clearSales() { if (confirm('Apagar todas as vendas?')) batchRun(sales, (b, x) => b.delete(col('vendas').doc(x.id))).catch(e => alert(e.message)); }
-const grp = f => { const o = {}; sales.forEach(r => o[r[f]] = (o[r[f]] || 0) + r.Valor_Total); return o; };
-function mk(id, type, labels, data, horiz) {
-  if (charts[id]) charts[id].destroy();
-  charts[id] = new Chart($(id).getContext('2d'), {type, data:{labels, datasets:[{data, backgroundColor:'rgba(16,185,129,.7)', borderColor:'#10b981', fill:type === 'line', tension:.3}]},
-    options:{indexAxis:horiz ? 'y' : 'x', responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}, tooltip:{callbacks:{label:c => BRL(c.raw)}}}}});
-}
-function renderSales() {
-  const fat = sales.reduce((s, r) => s + r.Valor_Total, 0), q = sales.reduce((s, r) => s + r.Quantidade, 0);
-  $('k-fat').textContent = BRL(fat); $('k-qtd').textContent = q; $('k-tic').textContent = BRL(sales.length ? fat / sales.length : 0); $('k-n').textContent = sales.length;
-  const m = {}; sales.forEach(r => { const k = r.Data.getFullYear() + '-' + String(r.Data.getMonth() + 1).padStart(2, '0'); m[k] = (m[k] || 0) + r.Valor_Total; });
-  const ms = Object.keys(m).sort(); mk('c-mes', 'line', ms, ms.map(k => m[k]));
-  const rg = grp('Regiao'); mk('c-reg', 'bar', Object.keys(rg), Object.values(rg));
-  const vd = Object.entries(grp('Vendedor')).sort((a, b) => b[1] - a[1]).slice(0, 8); mk('c-ven', 'bar', vd.map(x => x[0]), vd.map(x => x[1]), true);
+  ts.forEach((t, i) => { const a = H[t] || []; lineChart('h:' + t, 'ch-' + i, a.map(x => fmtT(x.t)), a.map(x => x.c), 'Preço'); });
+  if (!ts.length) { if (charts.pat) { charts.pat.destroy(); delete charts.pat; } return; }
+  const qty = {}; hold.forEach(h => qty[h.t] = (qty[h.t] || 0) + h.q);
+  const times = [...new Set(ts.flatMap(t => (H[t] || []).map(x => x.t)))].sort((a, b) => a - b);
+  const vals = times.map(time => ts.reduce((s, t) => {
+    const p = priceAt(t, time); const fb = Q[t] && Q[t].price ? Q[t].price : 0;
+    return s + qty[t] * (p == null ? fb : p);
+  }, 0));
+  lineChart('pat', 'c-pat', times.map(fmtT), vals, 'Patrimônio');
 }
 </script>
 </body>
