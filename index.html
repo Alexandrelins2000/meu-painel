@@ -193,6 +193,7 @@ const $ = id => document.getElementById(id);
 const BRL = v => (v || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
 const msg = t => $('msg').textContent = t || '';
 let uid = null, hold = [], favs = [], top21 = [], top21Quedas = [], allStocks = [], charts = {}, unsubs = [], timer = null, cur = '', Q = {}, H = {}, fails = [];
+let idleTimer = null;
 
 try {
   const c = JSON.parse(localStorage.getItem('qcache2') || '{}');
@@ -212,6 +213,24 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth(), db = firebase.firestore();
 const col = n => db.collection('users').doc(uid).collection(n);
+
+/* ===== CONTROLE DE INATIVIDADE (5 MINUTOS) ===== */
+function resetIdleTimer() {
+  if (!uid) return;
+  clearTimeout(idleTimer);
+  // 5 minutos em milissegundos (5 * 60 * 1000 = 300000)
+  idleTimer = setTimeout(() => {
+    if (uid) {
+      console.log('Sessão encerrada por inatividade de 5 minutos.');
+      auth.signOut();
+    }
+  }, 300000);
+}
+
+// Ouve eventos de movimento do mouse, cliques, teclas e toque na tela
+['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'].forEach(evt => {
+  document.addEventListener(evt, resetIdleTimer, true);
+});
 
 /* ===== AUTH ===== */
 function show(id) { ['v-login','v-reg','v-verify'].forEach(i => $(i).classList.toggle('hide', i !== id)); msg(); }
@@ -237,7 +256,7 @@ auth.onAuthStateChanged(u => {
   enter(u);
 });
 function leave() {
-  unsubs.forEach(f => f()); unsubs = []; clearInterval(timer); uid = null; hold = []; favs = [];
+  unsubs.forEach(f => f()); unsubs = []; clearInterval(timer); clearTimeout(idleTimer); uid = null; hold = []; favs = [];
   $('app').classList.add('hide'); $('auth').style.display = 'flex'; show('v-login');
 }
 
@@ -246,6 +265,8 @@ function enter(u) {
   if (uid === u.uid) return;
   uid = u.uid; $('auth').style.display = 'none'; $('app').classList.remove('hide');
   $('who').textContent = u.displayName || u.email;
+  resetIdleTimer(); // Inicia o contador de inatividade ao entrar
+
   const err = e => { $('live').textContent = '● nuvem offline (modo local)'; $('live').style.color = 'var(--mu)'; };
   let first = true;
 
