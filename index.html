@@ -41,12 +41,12 @@ nav div{padding:13px 18px;color:var(--mu);cursor:pointer;border-bottom:2px solid
 nav .on{color:var(--em);border-color:var(--em);font-weight:600}
 .pg{padding:24px;max-width:1200px;margin:auto}
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px}
-.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:16px;margin-bottom:16px;position:relative}
 .kpi small{color:var(--mu);font-size:12px}.kpi b{display:block;font-size:20px;margin-top:4px}
 .up{color:var(--em)}.dn{color:var(--rd)}
 .row{display:flex;gap:10px;flex-wrap:wrap}.row input{margin:0;flex:1;min-width:120px}
-.cv{position:relative;height:160px} /* Altura reduzida para os gráficos individuais */
-.cv-pat{position:relative;height:240px} /* Altura original para o patrimônio geral */
+.cv{position:relative;height:160px}
+.cv-pat{position:relative;height:240px}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(--tx)}th{color:var(--mu);font-weight:500}
 .pop{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
@@ -54,6 +54,10 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(-
 .pop .card:hover{border-color:var(--em)}
 .pop .rm-fav{position:absolute;top:8px;right:8px;color:#ffffff;font-size:14px;cursor:pointer;background:none;border:none;padding:2px}
 .pop .rm-fav:hover{color:var(--rd)}
+
+/* BOTÃO FECHAR NO CARD DE MERCADO */
+.close-market{position:absolute;top:16px;right:16px;background:transparent;border:none;color:var(--mu);font-size:18px;cursor:pointer;padding:4px 8px;border-radius:6px}
+.close-market:hover{background:var(--bd);color:var(--rd)}
 
 /* GRADE DE 3 COLUNAS PARA OS GRÁFICOS DAS COTAS */
 .grid3{display:grid;grid-template-columns:repeat(3, 1fr);gap:16px}
@@ -160,6 +164,7 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(-
   </div>
   <div class="msg" id="s-msg"></div>
   <div id="s-res" class="hide card">
+    <button class="close-market" onclick="closeMarketSearch()" title="Fechar">✕</button>
     <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
       <div>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
@@ -175,7 +180,7 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(-
       <div><small>Mínima</small><br><b id="s-mn"></b></div><div><small>Volume</small><br><b id="s-vol"></b></div>
     </div>
     <div class="cv-pat"><canvas id="c-stock"></canvas></div>
-    <small style="color:var(--mu)">Atualiza a cada 60 s. Passe o mouse no gráfico: data, preço e quanto subiu ou desceu.</small>
+    <small style="color:var(--mu)">Atualiza a cada 60 s. Passe o mouse no gráfico: veja a data e o valor exato da ação.</small>
   </div>
 
   <!-- SEÇÃO FAVORITOS -->
@@ -378,7 +383,16 @@ function pickAc(ticker, isHold) {
     autoFillPrice(ticker);
     $('h-q').focus(); 
   }
-  else { $('s-q').value = ticker; search(); }
+  else { 
+    $('s-q').value = ticker; 
+    search(); 
+  }
+}
+
+function selectStockCard(ticker) {
+  $('s-q').value = ticker;
+  search();
+  window.scrollTo({top: 0, behavior: 'smooth'});
 }
 
 function closeAc() { $('s-ac').classList.add('hide'); $('h-ac').classList.add('hide'); }
@@ -463,7 +477,7 @@ function renderFavs() {
   sec.classList.remove('hide');
   $('fav-list').innerHTML = favs.map(t => {
     const d = Q[t], p = d ? d.pct || 0 : 0;
-    return `<div class="card" onclick="$('s-q').value='${t}';search()">
+    return `<div class="card" onclick="selectStockCard('${t}')">
       <button class="rm-fav" title="Remover" onclick="event.stopPropagation();toggleFav('${t}')">✕</button>
       <b>${t}</b><br>${d ? BRL(d.price) + `<br><span class="${p >= 0 ? 'up' : 'dn'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</span>` : '<small style="color:var(--mu)">carregando...</small>'}
     </div>`;
@@ -482,8 +496,7 @@ function lineChart(key, canvasId, labels, data, fmt) {
     options:{responsive:true, maintainAspectRatio:false, animation:false, plugins:{legend:{display:false}, tooltip:{callbacks:{
       title: c => 'Data: ' + c[0].label,
       label: c => {
-        const a = c.dataset.data, i = c.dataIndex, prev = i ? a[i-1] : a[0], df = c.raw - prev, pc = prev ? df / prev * 100 : 0;
-        return [`${fmt}: ${BRL(c.raw)}`, `vs. dia anterior: ${df >= 0 ? '+' : ''}${df.toFixed(2)} (${pc.toFixed(2)}%)`, `vs. início: ${((c.raw / a[0] - 1) * 100).toFixed(2)}%`];
+        return `Valor: ${BRL(c.raw)}`;
       }}}}}});
 }
 const fmtT = ms => new Date(ms).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
@@ -507,11 +520,17 @@ async function search(silent) {
   } catch (e) { if (silent !== true) $('s-msg').textContent = e.message; }
 }
 
+function closeMarketSearch() {
+  $('s-res').classList.add('hide');
+  $('s-q').value = '';
+  cur = '';
+}
+
 function renderPop() {
   const list = top21.length ? top21 : ['PETR4','VALE3','ITUB4','BBDC4','TAEE11','WEGE3','BBAS3','ABEV3'];
   $('pop').innerHTML = list.map(t => {
     const d = Q[t], p = d ? d.pct || 0 : 0;
-    return `<div class="card" onclick="$('s-q').value='${t}';search()"><b>${t}</b><br>${d ? BRL(d.price) + `<br><span class="${p >= 0 ? 'up' : 'dn'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</span>` : '<small style="color:var(--mu)">carregando...</small>'}</div>`;
+    return `<div class="card" onclick="selectStockCard('${t}')"><b>${t}</b><br>${d ? BRL(d.price) + `<br><span class="${p >= 0 ? 'up' : 'dn'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</span>` : '<small style="color:var(--mu)">carregando...</small>'}</div>`;
   }).join('');
 }
 
@@ -519,7 +538,7 @@ function renderQuedas() {
   const list = top21Quedas.length ? top21Quedas : ['PETR4','VALE3','ITUB4','BBDC4','TAEE11','WEGE3','BBAS3','ABEV3'];
   $('pop-quedas').innerHTML = list.map(t => {
     const d = Q[t], p = d ? d.pct || 0 : 0;
-    return `<div class="card" onclick="$('s-q').value='${t}';search()"><b>${t}</b><br>${d ? BRL(d.price) + `<br><span class="${p >= 0 ? 'up' : 'dn'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</span>` : '<small style="color:var(--mu)">carregando...</small>'}</div>`;
+    return `<div class="card" onclick="selectStockCard('${t}')"><b>${t}</b><br>${d ? BRL(d.price) + `<br><span class="${p >= 0 ? 'up' : 'dn'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</span>` : '<small style="color:var(--mu)">carregando...</small>'}</div>`;
   }).join('');
 }
 
