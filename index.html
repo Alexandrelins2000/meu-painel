@@ -9,7 +9,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
-:root{--bg:#0b0f14;--card:#111827;--bd:#1f2937;--em:#10b981;--emd:#059669;--tx:#e5e7eb;--mu:#9ca3af;--rd:#ef4444}
+:root{--bg:#0b0f14;--card:#111827;--bd:#1f2937;--em:#10b981;--emd:#059669;--tx:#e5e7eb;--mu:#9ca3af;--rd:#ef4444;--yl:#f59e0b}
 [data-theme=light]{--bg:#f3f4f6;--card:#fff;--bd:#e5e7eb;--tx:#111827;--mu:#6b7280}
 *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',system-ui,sans-serif}
 body{background:var(--bg);color:var(--tx);min-height:100vh}
@@ -25,6 +25,9 @@ button:hover{background:var(--emd)}
 .w{width:100%}
 .g{background:transparent;border:1px solid var(--bd);color:var(--mu)}
 .g:hover{background:transparent;border-color:var(--em);color:var(--em)}
+.fav-btn{background:transparent;border:1px solid var(--bd);color:var(--mu);padding:6px 12px;font-size:13px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.fav-btn:hover{border-color:var(--yl);color:var(--yl)}
+.fav-btn.on{border-color:var(--yl);color:var(--yl);background:rgba(245,158,11,0.12)}
 .msg{font-size:13px;color:var(--rd);text-align:center;margin:8px 0;min-height:16px}
 .sw{text-align:center;margin-top:14px;font-size:13px;color:var(--mu)}
 .sw a{color:var(--em);cursor:pointer}
@@ -46,9 +49,23 @@ nav .on{color:var(--em);border-color:var(--em);font-weight:600}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd)}th{color:var(--mu);font-weight:500}
 .pop{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
-.pop .card{cursor:pointer;margin:0;padding:12px}
+.pop .card{cursor:pointer;margin:0;padding:12px;position:relative;transition:border-color .15s}
+.pop .card:hover{border-color:var(--em)}
+.pop .rm-fav{position:absolute;top:8px;right:8px;color:var(--yl);font-size:14px;cursor:pointer;background:none;border:none;padding:2px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 @media(max-width:800px){.grid2{grid-template-columns:1fr}}
+
+/* AUTOCOMPLETE DROPDOWN */
+.ac-wrap{position:relative;flex:1;min-width:160px}
+.ac-wrap input{width:100%;margin:0}
+.ac-list{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--card);border:1px solid var(--bd);border-radius:10px;max-height:280px;overflow-y:auto;z-index:999;box-shadow:0 10px 25px rgba(0,0,0,0.45)}
+.ac-item{padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;border-bottom:1px solid var(--bd);gap:10px}
+.ac-item:last-child{border-bottom:none}
+.ac-item:hover,.ac-item.act{background:rgba(16,185,129,0.12)}
+.ac-left{display:flex;flex-direction:column;overflow:hidden}
+.ac-left b{color:var(--em);font-size:14px}
+.ac-left small{color:var(--mu);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ac-right{text-align:right;white-space:nowrap;font-size:13px}
 </style>
 </head>
 <body data-theme="dark">
@@ -98,7 +115,10 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd)}th{color:va
   <div class="card">
     <h4 style="margin-bottom:12px">Adicionar cota</h4>
     <div class="row">
-      <input id="h-t" placeholder="Ticker (ex: TAEE11)" autocomplete="off">
+      <div class="ac-wrap">
+        <input id="h-t" placeholder="Ticker (ex: TAEE11)" autocomplete="off" oninput="filterAc('h-t','h-ac',true)" onfocus="filterAc('h-t','h-ac',true)">
+        <div id="h-ac" class="ac-list hide"></div>
+      </div>
       <input id="h-q" type="number" min="1" placeholder="Quantidade">
       <input id="h-p" type="number" step="0.01" min="0" placeholder="Preço médio (R$)" onkeydown="if(event.key==='Enter')saveHold()">
       <button onclick="saveHold()">Adicionar</button>
@@ -118,13 +138,25 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd)}th{color:va
 
 <div class="pg hide" id="t-mercado">
   <div class="row" style="margin-bottom:10px">
-    <input id="s-q" placeholder="Pesquisar ação: TAEE11, PETR4, VALE3..." onkeydown="if(event.key==='Enter')search()">
-    <button onclick="search()">Buscar</button>
+    <div class="ac-wrap">
+      <input id="s-q" placeholder="Digite o código ou nome (ex: M, MX, PETR, TAEE...)" autocomplete="off"
+             oninput="filterAc('s-q','s-ac',false)"
+             onfocus="filterAc('s-q','s-ac',false)"
+             onkeydown="if(event.key==='Enter'){closeAc();search();}">
+      <div id="s-ac" class="ac-list hide"></div>
+    </div>
+    <button onclick="closeAc();search()">Buscar</button>
   </div>
   <div class="msg" id="s-msg"></div>
   <div id="s-res" class="hide card">
-    <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
-      <div><h2 id="s-nome"></h2><small id="s-tick" style="color:var(--mu)"></small></div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+      <div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <h2 id="s-nome"></h2>
+          <button id="btn-fav" class="fav-btn" onclick="toggleFav()">☆ Favoritar</button>
+        </div>
+        <small id="s-tick" style="color:var(--mu)"></small>
+      </div>
       <div style="text-align:right"><h2 id="s-preco"></h2><div id="s-var"></div></div>
     </div>
     <div class="kpis" style="margin:14px 0">
@@ -134,21 +166,35 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd)}th{color:va
     <div class="cv"><canvas id="c-stock"></canvas></div>
     <small style="color:var(--mu)">Atualiza a cada 60 s. Passe o mouse no gráfico: data, preço e quanto subiu ou desceu.</small>
   </div>
-  <h3 style="margin:18px 0 10px">Populares</h3><div class="pop" id="pop"></div>
+
+  <!-- SEÇÃO FAVORITOS (ACIMA DE POPULARES) -->
+  <div id="fav-sec" class="hide">
+    <h3 style="margin:18px 0 10px;color:var(--yl)">★ Favoritos</h3>
+    <div class="pop" id="fav-list"></div>
+  </div>
+
+  <!-- SEÇÃO POPULARES (TOP 20 MAIORES ALTAS) -->
+  <h3 style="margin:18px 0 10px">Populares (Top 20 Maiores Altas)</h3>
+  <div class="pop" id="pop"></div>
 </div>
 </div>
 
 <script>
 /* =================================================================== */
-/* TOKEN */
 const BRAPI_TOKEN = "pXaqwKR2nR7gTXLabyzrys";
 /* =================================================================== */
 
 const $ = id => document.getElementById(id);
 const BRL = v => (v || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
 const msg = t => $('msg').textContent = t || '';
-let uid = null, hold = [], charts = {}, unsubs = [], timer = null, cur = '', Q = {}, H = {}, fails = [];
-try { const c = JSON.parse(localStorage.getItem('qcache2') || '{}'); Q = c.Q || {}; H = c.H || {}; } catch (e) {}
+let uid = null, hold = [], favs = [], top20 = [], allStocks = [], charts = {}, unsubs = [], timer = null, cur = '', Q = {}, H = {}, fails = [];
+
+try {
+  const c = JSON.parse(localStorage.getItem('qcache2') || '{}');
+  Q = c.Q || {}; H = c.H || {};
+  allStocks = JSON.parse(localStorage.getItem('b3_list') || '[]');
+  hold = JSON.parse(localStorage.getItem('local_hold') || '[]');
+} catch (e) {}
 
 const firebaseConfig = {
   apiKey: "AIzaSyAvEOf4i-2CZ5Xut0AfGdjjhUpUNjac20Q",
@@ -186,7 +232,7 @@ auth.onAuthStateChanged(u => {
   enter(u);
 });
 function leave() {
-  unsubs.forEach(f => f()); unsubs = []; clearInterval(timer); uid = null; hold = [];
+  unsubs.forEach(f => f()); unsubs = []; clearInterval(timer); uid = null; hold = []; favs = [];
   $('app').classList.add('hide'); $('auth').style.display = 'flex'; show('v-login');
 }
 
@@ -195,15 +241,31 @@ function enter(u) {
   if (uid === u.uid) return;
   uid = u.uid; $('auth').style.display = 'none'; $('app').classList.remove('hide');
   $('who').textContent = u.displayName || u.email;
-  const err = e => { $('live').textContent = '● erro: ' + (e.code === 'permission-denied' ? 'confira as regras do Firestore' : e.message); $('live').style.color = 'var(--rd)'; };
+  const err = e => { $('live').textContent = '● nuvem offline (modo local)'; $('live').style.color = 'var(--mu)'; };
   let first = true;
+
+  renderHold(); // Renderiza imediato com o cache local para não piscar vazio
+
   unsubs.push(col('cotas').onSnapshot(s => {
-    hold = s.docs.map(d => ({id: d.id, ...d.data()}));
-    renderHold();
+    if (!s.empty) {
+      hold = s.docs.map(d => ({id: d.id, ...d.data()}));
+      try { localStorage.setItem('local_hold', JSON.stringify(hold)); } catch(e){}
+      renderHold();
+    }
     if (first || hold.some(h => !H[h.t])) refresh();
     first = false;
   }, err));
-  renderPop(); timer = setInterval(refresh, 60000);
+
+  unsubs.push(col('favoritos').onSnapshot(s => {
+    favs = s.docs.map(d => d.id).sort();
+    renderFavs();
+    updateFavBtn();
+    if (favs.some(t => !Q[t])) refresh();
+  }, err));
+
+  fetchAllB3();
+  refresh();
+  timer = setInterval(refresh, 60000);
 }
 function stamp() {
   const l = $('live');
@@ -217,31 +279,131 @@ function tab(n, el) {
   Object.values(charts).forEach(c => c.resize());
 }
 
-/* ===== COTAÇÕES (brapi.dev - Plano Gratuito: interval=1d) ===== */
-const POP = ['PETR4','VALE3','ITUB4','BBDC4','TAEE11','WEGE3','BBAS3','ABEV3'];
+/* ===== AUTOCOMPLETE INSTANTÂNEO ===== */
+async function fetchAllB3() {
+  try {
+    const tk = getTk();
+    const url = `https://brapi.dev/api/quote/list?sortBy=volume&sortOrder=desc${tk ? '&token=' + encodeURIComponent(tk) : ''}`;
+    const r = await fetch(url), j = await r.json();
+    if (r.ok && j.stocks && j.stocks.length) {
+      allStocks = j.stocks.map(s => ({
+        t: s.stock,
+        n: s.name || s.stock,
+        p: s.close || 0,
+        c: s.change || 0
+      }));
+      try { localStorage.setItem('b3_list', JSON.stringify(allStocks)); } catch (e) {}
+    }
+  } catch (e) { console.error('Erro B3:', e); }
+}
+
+function filterAc(inputId, listId, isHold) {
+  const val = $(inputId).value.trim().toUpperCase();
+  const box = $(listId);
+  if (!val) { box.classList.add('hide'); return; }
+
+  const starts = allStocks.filter(s => s.t.startsWith(val));
+  const includes = allStocks.filter(s => !s.t.startsWith(val) && (s.t.includes(val) || s.n.toUpperCase().includes(val)));
+  const matches = [...starts, ...includes].slice(0, 12);
+
+  if (!matches.length) { box.classList.add('hide'); return; }
+
+  box.innerHTML = matches.map(s => {
+    const d = Q[s.t];
+    const price = d ? d.price : s.p;
+    const pct = d ? (d.pct || 0) : (s.c || 0);
+    return `<div class="ac-item" onmousedown="pickAc('${s.t}', ${isHold})">
+      <div class="ac-left"><b>${s.t}</b><small>${s.n}</small></div>
+      <div class="ac-right"><div>${price ? BRL(price) : ''}</div><small class="${pct >= 0 ? 'up' : 'dn'}">${price ? (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%' : ''}</small></div>
+    </div>`;
+  }).join('');
+  box.classList.remove('hide');
+}
+
+function pickAc(ticker, isHold) {
+  closeAc();
+  if (isHold) { $('h-t').value = ticker; $('h-q').focus(); }
+  else { $('s-q').value = ticker; search(); }
+}
+
+function closeAc() { $('s-ac').classList.add('hide'); $('h-ac').classList.add('hide'); }
+document.addEventListener('click', e => { if (!e.target.closest('.ac-wrap')) closeAc(); });
+
+/* ===== COTAÇÕES & TOP 20 ===== */
+const getTk = () => (BRAPI_TOKEN && BRAPI_TOKEN !== 'COLE_SEU_TOKEN_AQUI') ? BRAPI_TOKEN : '';
+
 async function quote(t, range = '1mo', interval = '1d') {
-  const tk = (BRAPI_TOKEN && BRAPI_TOKEN !== 'COLE_SEU_TOKEN_AQUI') ? BRAPI_TOKEN : '';
+  const tk = getTk();
   const url = `https://brapi.dev/api/quote/${encodeURIComponent(t)}?range=${range}&interval=${interval}${tk ? '&token=' + encodeURIComponent(tk) : ''}`;
   const r = await fetch(url), j = await r.json();
-  if (!r.ok || !j.results || !j.results[0]) throw new Error(j.message || 'Ação não encontrada (verifique o token no código)');
+  if (!r.ok || !j.results || !j.results[0]) throw new Error(j.message || 'Ação não encontrada');
   return j.results[0];
 }
+
+async function fetchTop20() {
+  try {
+    const tk = getTk();
+    const url = `https://brapi.dev/api/quote/list?sortBy=change&sortOrder=desc&limit=20&type=stock${tk ? '&token=' + encodeURIComponent(tk) : ''}`;
+    const r = await fetch(url), j = await r.json();
+    if (r.ok && j.stocks && j.stocks.length) {
+      top20 = j.stocks.map(s => {
+        Q[s.stock] = {price: s.close, chg: 0, pct: s.change, name: s.name || s.stock};
+        return s.stock;
+      });
+    }
+  } catch (e) {}
+}
+
 const slim = d => ({price:d.regularMarketPrice, chg:d.regularMarketChange, pct:d.regularMarketChangePercent, name:d.shortName || d.longName || ''});
 const hist = d => (d.historicalDataPrice || []).filter(x => x.close != null).map(x => ({t:x.date * 1000, c:x.close}));
+
 async function loadHold(t) {
   const d = await quote(t, '1mo', '1d'), pts = hist(d);
   Q[t] = slim(d); if (pts.length) H[t] = pts;
 }
+
 async function refresh() {
   const mine = [...new Set(hold.map(h => h.t))];
+  const favOnly = favs.filter(t => !mine.includes(t));
   fails = [];
   await Promise.all([
+    fetchTop20(),
     ...mine.map(t => loadHold(t).catch(() => fails.push(t))),
-    ...POP.filter(t => !mine.includes(t)).map(t => quote(t, '5d', '1d').then(d => Q[t] = slim(d)).catch(() => {}))
+    ...favOnly.map(t => quote(t, '5d', '1d').then(d => Q[t] = slim(d)).catch(() => {}))
   ]);
   try { localStorage.setItem('qcache2', JSON.stringify({Q, H})); } catch (e) {}
-  renderPop(); renderHold(); stamp();
+  renderFavs(); renderPop(); renderHold(); stamp();
   if (cur) search(true);
+}
+
+/* ===== FAVORITOS ===== */
+function updateFavBtn() {
+  const btn = $('btn-fav');
+  if (!btn || !cur) return;
+  const isFav = favs.includes(cur);
+  btn.textContent = isFav ? '★ Favoritado' : '☆ Favoritar';
+  btn.classList.toggle('on', isFav);
+}
+
+function toggleFav(ticker) {
+  const t = ticker || cur;
+  if (!t || !uid) return;
+  const ref = col('favoritos').doc(t);
+  if (favs.includes(t)) ref.delete();
+  else ref.set({adicionadoEm: Date.now()});
+}
+
+function renderFavs() {
+  const sec = $('fav-sec');
+  if (!favs.length) { sec.classList.add('hide'); return; }
+  sec.classList.remove('hide');
+  $('fav-list').innerHTML = favs.map(t => {
+    const d = Q[t], p = d ? d.pct || 0 : 0;
+    return `<div class="card" onclick="$('s-q').value='${t}';search()">
+      <button class="rm-fav" title="Remover" onclick="event.stopPropagation();toggleFav('${t}')">★</button>
+      <b>${t}</b><br>${d ? BRL(d.price) + `<br><span class="${p >= 0 ? 'up' : 'dn'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</span>` : '<small style="color:var(--mu)">carregando...</small>'}
+    </div>`;
+  }).join('');
 }
 
 /* ===== MERCADO ===== */
@@ -261,11 +423,14 @@ function lineChart(key, canvasId, labels, data, fmt) {
       }}}}}});
 }
 const fmtT = ms => new Date(ms).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
+
 async function search(silent) {
   const t = silent === true ? cur : $('s-q').value.trim().toUpperCase(); if (!t) return;
-  cur = t; if (silent !== true) $('s-msg').textContent = 'Buscando...';
+  cur = t; updateFavBtn();
+  if (silent !== true) $('s-msg').textContent = 'Buscando...';
   try {
     const d = await quote(t, '1mo', '1d'), h = hist(d);
+    Q[t] = slim(d); renderFavs();
     $('s-msg').textContent = ''; $('s-res').classList.remove('hide');
     $('s-nome').textContent = d.longName || d.shortName || t; $('s-tick').textContent = d.symbol;
     $('s-preco').textContent = BRL(d.regularMarketPrice);
@@ -277,8 +442,10 @@ async function search(silent) {
     lineChart('stock', 'c-stock', h.map(x => fmtT(x.t)), h.map(x => x.c), 'Preço');
   } catch (e) { if (silent !== true) $('s-msg').textContent = e.message; }
 }
+
 function renderPop() {
-  $('pop').innerHTML = POP.map(t => {
+  const list = top20.length ? top20 : ['PETR4','VALE3','ITUB4','BBDC4','TAEE11','WEGE3','BBAS3','ABEV3'];
+  $('pop').innerHTML = list.map(t => {
     const d = Q[t], p = d ? d.pct || 0 : 0;
     return `<div class="card" onclick="$('s-q').value='${t}';search()"><b>${t}</b><br>${d ? BRL(d.price) + `<br><span class="${p >= 0 ? 'up' : 'dn'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</span>` : '<small style="color:var(--mu)">carregando...</small>'}</div>`;
   }).join('');
@@ -289,14 +456,38 @@ function saveHold() {
   const t = $('h-t').value.trim().toUpperCase(), q = +$('h-q').value, p = +$('h-p').value, m = $('h-msg');
   if (!t || !(q > 0) || !(p > 0)) { m.style.color = 'var(--rd)'; m.textContent = 'Preencha ticker, quantidade e preço médio.'; return; }
   $('h-t').value = $('h-q').value = $('h-p').value = ''; $('h-t').focus();
-  m.style.color = 'var(--em)'; m.textContent = `${t} adicionada. Pode inserir a próxima.`;
-  col('cotas').add({t, q, p}).catch(e => { m.style.color = 'var(--rd)'; m.textContent = 'Erro ao salvar ' + t + ': ' + e.message; });
+  m.style.color = 'var(--em)'; m.textContent = `${t} adicionada.`;
+
+  const novaCota = {t, q, p};
+  col('cotas').add(novaCota).then(docRef => {
+    novaCota.id = docRef.id;
+    hold.push(novaCota);
+    try { localStorage.setItem('local_hold', JSON.stringify(hold)); } catch(e){}
+    renderHold();
+  }).catch(e => {
+    m.style.color = 'var(--rd)'; m.textContent = 'Erro ao salvar: ' + e.message;
+  });
 }
-function rmHold(id) { if (confirm('Remover esta cota?')) col('cotas').doc(id).delete(); }
+
+function rmHold(id) {
+  if (!confirm('Remover esta cota?')) return;
+  col('cotas').doc(id).delete().then(() => {
+    hold = hold.filter(h => h.id !== id);
+    try { localStorage.setItem('local_hold', JSON.stringify(hold)); } catch(e){}
+    renderHold();
+  }).catch(e => {
+    // Se falhar no Firestore, remove localmente mesmo assim para agilizar
+    hold = hold.filter(h => h.id !== id);
+    try { localStorage.setItem('local_hold', JSON.stringify(hold)); } catch(e){}
+    renderHold();
+  });
+}
+
 const priceAt = (t, time) => {
   const a = H[t]; if (!a || !a.length) return null;
-  let v = a[0].c; for (const x of a) { if (x.t <= time) v = x.c; else break; } return v;
+  let v = a[0].c; for (const x of a) { if (x.t <= time) v = a[0].c; else break; } return v;
 };
+
 function renderHold() {
   try {
     let tot = 0, dia = 0, res = 0;
@@ -310,6 +501,7 @@ function renderHold() {
     renderPortCharts();
   } catch (e) { console.error(e); }
 }
+
 function renderPortCharts() {
   const ts = [...new Set(hold.map(h => h.t))], wrap = $('h-charts'), sig = ts.join(',');
   $('pat-card').classList.toggle('hide', !ts.length);
