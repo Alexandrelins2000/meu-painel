@@ -121,7 +121,6 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd)}th{color:va
     <input id="s-q" placeholder="Pesquisar ação: TAEE11, PETR4, VALE3..." onkeydown="if(event.key==='Enter')search()">
     <button onclick="search()">Buscar</button>
   </div>
-  <input id="s-token" placeholder="Token brapi.dev (grátis em brapi.dev; sem ele só funcionam alguns tickers)" onchange="localStorage.setItem('brapi',this.value.trim());refresh()">
   <div class="msg" id="s-msg"></div>
   <div id="s-res" class="hide card">
     <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
@@ -140,9 +139,11 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd)}th{color:va
 </div>
 
 <script>
-/* ====== COLE SEU TOKEN DA BRAPI ENTRE AS ASPAS ABAIXO ====== */
+/* =================================================================== */
+/* TOKEN */
 const BRAPI_TOKEN = "pXaqwKR2nR7gTXLabyzrys";
-/* =========================================================== */
+/* =================================================================== */
+
 const $ = id => document.getElementById(id);
 const BRL = v => (v || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
 const msg = t => $('msg').textContent = t || '';
@@ -193,7 +194,7 @@ function leave() {
 function enter(u) {
   if (uid === u.uid) return;
   uid = u.uid; $('auth').style.display = 'none'; $('app').classList.remove('hide');
-  $('who').textContent = u.displayName || u.email; $('s-token').value = localStorage.getItem('brapi') || '';
+  $('who').textContent = u.displayName || u.email;
   const err = e => { $('live').textContent = '● erro: ' + (e.code === 'permission-denied' ? 'confira as regras do Firestore' : e.message); $('live').style.color = 'var(--rd)'; };
   let first = true;
   unsubs.push(col('cotas').onSnapshot(s => {
@@ -219,10 +220,10 @@ function tab(n, el) {
 /* ===== COTAÇÕES (brapi.dev) ===== */
 const POP = ['PETR4','VALE3','ITUB4','BBDC4','TAEE11','WEGE3','BBAS3','ABEV3'];
 async function quote(t, range = '1d', interval = '15m') {
-  const tk = (BRAPI_TOKEN !== 'COLE_SEU_TOKEN_AQUI' ? BRAPI_TOKEN : '') || localStorage.getItem('brapi') || '';
+  const tk = (BRAPI_TOKEN && BRAPI_TOKEN !== 'COLE_SEU_TOKEN_AQUI') ? BRAPI_TOKEN : '';
   const url = `https://brapi.dev/api/quote/${encodeURIComponent(t)}?range=${range}&interval=${interval}${tk ? '&token=' + encodeURIComponent(tk) : ''}`;
   const r = await fetch(url), j = await r.json();
-  if (!r.ok || !j.results || !j.results[0]) throw new Error(j.message || 'Ação não encontrada (ou token necessário)');
+  if (!r.ok || !j.results || !j.results[0]) throw new Error(j.message || 'Ação não encontrada (verifique o token no código)');
   return j.results[0];
 }
 const slim = d => ({price:d.regularMarketPrice, chg:d.regularMarketChange, pct:d.regularMarketChangePercent, name:d.shortName || d.longName || ''});
