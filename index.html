@@ -194,6 +194,7 @@ const BRL = v => (v || 0).toLocaleString('pt-BR', {style:'currency', currency:'B
 const msg = t => $('msg').textContent = t || '';
 let uid = null, hold = [], favs = [], top21 = [], top21Quedas = [], allStocks = [], charts = {}, unsubs = [], timer = null, cur = '', Q = {}, H = {}, fails = [];
 let idleTimer = null;
+let msgTimer = null;
 
 try {
   const c = JSON.parse(localStorage.getItem('qcache2') || '{}');
@@ -218,16 +219,13 @@ const col = n => db.collection('users').doc(uid).collection(n);
 function resetIdleTimer() {
   if (!uid) return;
   clearTimeout(idleTimer);
-  // 5 minutos em milissegundos (5 * 60 * 1000 = 300000)
   idleTimer = setTimeout(() => {
     if (uid) {
-      console.log('Sessão encerrada por inatividade de 5 minutos.');
       auth.signOut();
     }
   }, 300000);
 }
 
-// Ouve eventos de movimento do mouse, cliques, teclas e toque na tela
 ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'].forEach(evt => {
   document.addEventListener(evt, resetIdleTimer, true);
 });
@@ -256,7 +254,7 @@ auth.onAuthStateChanged(u => {
   enter(u);
 });
 function leave() {
-  unsubs.forEach(f => f()); unsubs = []; clearInterval(timer); clearTimeout(idleTimer); uid = null; hold = []; favs = [];
+  unsubs.forEach(f => f()); unsubs = []; clearInterval(timer); clearTimeout(idleTimer); clearTimeout(msgTimer); uid = null; hold = []; favs = [];
   $('app').classList.add('hide'); $('auth').style.display = 'flex'; show('v-login');
 }
 
@@ -265,7 +263,7 @@ function enter(u) {
   if (uid === u.uid) return;
   uid = u.uid; $('auth').style.display = 'none'; $('app').classList.remove('hide');
   $('who').textContent = u.displayName || u.email;
-  resetIdleTimer(); // Inicia o contador de inatividade ao entrar
+  resetIdleTimer();
 
   const err = e => { $('live').textContent = '● nuvem offline (modo local)'; $('live').style.color = 'var(--mu)'; };
   let first = true;
@@ -369,7 +367,6 @@ async function quote(t, range = '1mo', interval = '1d') {
 async function fetchTop21() {
   try {
     const tk = getTk();
-    // Maiores Altas
     const r1 = await fetch(`https://brapi.dev/api/quote/list?sortBy=change&sortOrder=desc&limit=21&type=stock${tk ? '&token=' + encodeURIComponent(tk) : ''}`);
     const j1 = await r1.json();
     if (r1.ok && j1.stocks && j1.stocks.length) {
@@ -379,7 +376,6 @@ async function fetchTop21() {
       });
     }
 
-    // Maiores Quedas
     const r2 = await fetch(`https://brapi.dev/api/quote/list?sortBy=change&sortOrder=asc&limit=21&type=stock${tk ? '&token=' + encodeURIComponent(tk) : ''}`);
     const j2 = await r2.json();
     if (r2.ok && j2.stocks && j2.stocks.length) {
@@ -501,7 +497,15 @@ function saveHold() {
   const t = $('h-t').value.trim().toUpperCase(), q = +$('h-q').value, p = +$('h-p').value, m = $('h-msg');
   if (!t || !(q > 0) || !(p > 0)) { m.style.color = 'var(--rd)'; m.textContent = 'Preencha ticker, quantidade e preço médio.'; return; }
   $('h-t').value = $('h-q').value = $('h-p').value = ''; $('h-t').focus();
-  m.style.color = 'var(--em)'; m.textContent = `${t} adicionada.`;
+  
+  clearTimeout(msgTimer);
+  m.style.color = 'var(--em)'; 
+  m.textContent = `${t} adicionada.`;
+
+  // Apaga a mensagem após 10 segundos
+  msgTimer = setTimeout(() => {
+    m.textContent = '';
+  }, 10000);
 
   const novaCota = {t, q, p};
   col('cotas').add(novaCota).then(docRef => {
