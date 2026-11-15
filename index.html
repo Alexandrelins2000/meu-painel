@@ -167,14 +167,14 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd)}th{color:va
     <small style="color:var(--mu)">Atualiza a cada 60 s. Passe o mouse no gráfico: data, preço e quanto subiu ou desceu.</small>
   </div>
 
-  <!-- SEÇÃO FAVORITOS (ACIMA DE POPULARES) -->
+  <!-- SEÇÃO FAVORITOS (LIMPA, APENAS OS CARDS) -->
   <div id="fav-sec" class="hide">
-    <h3 style="margin:18px 0 10px;color:var(--yl)">★ Favoritos</h3>
+    <h3 style="margin:18px 0 10px;color:var(--yl)">Favoritos</h3>
     <div class="pop" id="fav-list"></div>
   </div>
 
-  <!-- SEÇÃO POPULARES (TOP 20 MAIORES ALTAS) -->
-  <h3 style="margin:18px 0 10px">Populares (Top 20 Maiores Altas)</h3>
+  <!-- SEÇÃO POPULARES (TOP 21 MAIORES ALTAS) -->
+  <h3 style="margin:18px 0 10px">Populares (Top 21 Maiores Altas)</h3>
   <div class="pop" id="pop"></div>
 </div>
 </div>
@@ -187,7 +187,7 @@ const BRAPI_TOKEN = "pXaqwKR2nR7gTXLabyzrys";
 const $ = id => document.getElementById(id);
 const BRL = v => (v || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
 const msg = t => $('msg').textContent = t || '';
-let uid = null, hold = [], favs = [], top20 = [], allStocks = [], charts = {}, unsubs = [], timer = null, cur = '', Q = {}, H = {}, fails = [];
+let uid = null, hold = [], favs = [], top21 = [], allStocks = [], charts = {}, unsubs = [], timer = null, cur = '', Q = {}, H = {}, fails = [];
 
 try {
   const c = JSON.parse(localStorage.getItem('qcache2') || '{}');
@@ -244,7 +244,7 @@ function enter(u) {
   const err = e => { $('live').textContent = '● nuvem offline (modo local)'; $('live').style.color = 'var(--mu)'; };
   let first = true;
 
-  renderHold(); // Renderiza imediato com o cache local para não piscar vazio
+  renderHold();
 
   unsubs.push(col('cotas').onSnapshot(s => {
     if (!s.empty) {
@@ -329,7 +329,7 @@ function pickAc(ticker, isHold) {
 function closeAc() { $('s-ac').classList.add('hide'); $('h-ac').classList.add('hide'); }
 document.addEventListener('click', e => { if (!e.target.closest('.ac-wrap')) closeAc(); });
 
-/* ===== COTAÇÕES & TOP 20 ===== */
+/* ===== COTAÇÕES & TOP 21 ===== */
 const getTk = () => (BRAPI_TOKEN && BRAPI_TOKEN !== 'COLE_SEU_TOKEN_AQUI') ? BRAPI_TOKEN : '';
 
 async function quote(t, range = '1mo', interval = '1d') {
@@ -340,13 +340,13 @@ async function quote(t, range = '1mo', interval = '1d') {
   return j.results[0];
 }
 
-async function fetchTop20() {
+async function fetchTop21() {
   try {
     const tk = getTk();
-    const url = `https://brapi.dev/api/quote/list?sortBy=change&sortOrder=desc&limit=20&type=stock${tk ? '&token=' + encodeURIComponent(tk) : ''}`;
+    const url = `https://brapi.dev/api/quote/list?sortBy=change&sortOrder=desc&limit=21&type=stock${tk ? '&token=' + encodeURIComponent(tk) : ''}`;
     const r = await fetch(url), j = await r.json();
     if (r.ok && j.stocks && j.stocks.length) {
-      top20 = j.stocks.map(s => {
+      top21 = j.stocks.map(s => {
         Q[s.stock] = {price: s.close, chg: 0, pct: s.change, name: s.name || s.stock};
         return s.stock;
       });
@@ -367,7 +367,7 @@ async function refresh() {
   const favOnly = favs.filter(t => !mine.includes(t));
   fails = [];
   await Promise.all([
-    fetchTop20(),
+    fetchTop21(),
     ...mine.map(t => loadHold(t).catch(() => fails.push(t))),
     ...favOnly.map(t => quote(t, '5d', '1d').then(d => Q[t] = slim(d)).catch(() => {}))
   ]);
@@ -400,7 +400,7 @@ function renderFavs() {
   $('fav-list').innerHTML = favs.map(t => {
     const d = Q[t], p = d ? d.pct || 0 : 0;
     return `<div class="card" onclick="$('s-q').value='${t}';search()">
-      <button class="rm-fav" title="Remover" onclick="event.stopPropagation();toggleFav('${t}')">★</button>
+      <button class="rm-fav" title="Remover" onclick="event.stopPropagation();toggleFav('${t}')">✕</button>
       <b>${t}</b><br>${d ? BRL(d.price) + `<br><span class="${p >= 0 ? 'up' : 'dn'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</span>` : '<small style="color:var(--mu)">carregando...</small>'}
     </div>`;
   }).join('');
@@ -444,7 +444,7 @@ async function search(silent) {
 }
 
 function renderPop() {
-  const list = top20.length ? top20 : ['PETR4','VALE3','ITUB4','BBDC4','TAEE11','WEGE3','BBAS3','ABEV3'];
+  const list = top21.length ? top21 : ['PETR4','VALE3','ITUB4','BBDC4','TAEE11','WEGE3','BBAS3','ABEV3'];
   $('pop').innerHTML = list.map(t => {
     const d = Q[t], p = d ? d.pct || 0 : 0;
     return `<div class="card" onclick="$('s-q').value='${t}';search()"><b>${t}</b><br>${d ? BRL(d.price) + `<br><span class="${p >= 0 ? 'up' : 'dn'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</span>` : '<small style="color:var(--mu)">carregando...</small>'}</div>`;
@@ -476,7 +476,6 @@ function rmHold(id) {
     try { localStorage.setItem('local_hold', JSON.stringify(hold)); } catch(e){}
     renderHold();
   }).catch(e => {
-    // Se falhar no Firestore, remove localmente mesmo assim para agilizar
     hold = hold.filter(h => h.id !== id);
     try { localStorage.setItem('local_hold', JSON.stringify(hold)); } catch(e){}
     renderHold();
