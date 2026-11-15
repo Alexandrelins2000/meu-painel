@@ -140,6 +140,9 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd)}th{color:va
 </div>
 
 <script>
+/* ====== COLE SEU TOKEN DA BRAPI ENTRE AS ASPAS ABAIXO ====== */
+const BRAPI_TOKEN = "pXaqwKR2nR7gTXLabyzrys";
+/* =========================================================== */
 const $ = id => document.getElementById(id);
 const BRL = v => (v || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
 const msg = t => $('msg').textContent = t || '';
@@ -216,7 +219,7 @@ function tab(n, el) {
 /* ===== COTAÇÕES (brapi.dev) ===== */
 const POP = ['PETR4','VALE3','ITUB4','BBDC4','TAEE11','WEGE3','BBAS3','ABEV3'];
 async function quote(t, range = '1d', interval = '15m') {
-  const tk = localStorage.getItem('brapi') || '';
+  const tk = (BRAPI_TOKEN !== 'COLE_SEU_TOKEN_AQUI' ? BRAPI_TOKEN : '') || localStorage.getItem('brapi') || '';
   const url = `https://brapi.dev/api/quote/${encodeURIComponent(t)}?range=${range}&interval=${interval}${tk ? '&token=' + encodeURIComponent(tk) : ''}`;
   const r = await fetch(url), j = await r.json();
   if (!r.ok || !j.results || !j.results[0]) throw new Error(j.message || 'Ação não encontrada (ou token necessário)');
