@@ -5,9 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ALFbroker</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <style>
 :root{--bg:#0b0f14;--card:#111827;--bd:#1f2937;--em:#10b981;--emd:#059669;--tx:#ffffff;--mu:#9ca3af;--rd:#ef4444;--yl:#f59e0b}
 [data-theme=light]{--bg:#f3f4f6;--card:#fff;--bd:#e5e7eb;--tx:#111827;--mu:#6b7280}
@@ -54,29 +51,21 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(-
 .pop .card:hover{border-color:var(--em)}
 .pop .rm-fav{position:absolute;top:8px;right:8px;color:#ffffff;font-size:14px;cursor:pointer;background:none;border:none;padding:2px}
 .pop .rm-fav:hover{color:var(--rd)}
-
-/* BOTÃO FECHAR NO CARD DE MERCADO */
 .close-market{position:absolute;top:16px;right:16px;background:transparent;border:none;color:var(--mu);font-size:18px;cursor:pointer;padding:4px 8px;border-radius:6px}
 .close-market:hover{background:var(--bd);color:var(--rd)}
-
-/* GRADE DE 3 COLUNAS PARA OS GRÁFICOS DAS COTAS */
-.grid3{display:grid;grid-template-columns:repeat(3, 1fr);gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 @media(max-width:900px){.grid3{grid-template-columns:1fr 1fr}}
 @media(max-width:600px){.grid3{grid-template-columns:1fr}}
-
-/* ESTILIZAÇÃO DO CONTROLE [-[]+] NA TABELA */
 .qty-ctrl{display:inline-flex;align-items:center;gap:4px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:2px}
 .qty-ctrl button{background:transparent;color:var(--tx);border:none;width:24px;height:24px;font-weight:bold;cursor:pointer;border-radius:4px;display:flex;align-items:center;justify-content:center}
 .qty-ctrl button:hover{background:var(--bd);color:var(--em)}
 .qty-ctrl input{width:45px;background:transparent;border:none;color:var(--tx);text-align:center;font-size:13px;outline:none;margin:0;padding:0}
-
-/* AUTOCOMPLETE DROPDOWN */
 .ac-wrap{position:relative;flex:1;min-width:160px}
 .ac-wrap input{width:100%;margin:0}
 .ac-list{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--card);border:1px solid var(--bd);border-radius:10px;max-height:280px;overflow-y:auto;z-index:999;box-shadow:0 10px 25px rgba(0,0,0,0.45)}
 .ac-item{padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;border-bottom:1px solid var(--bd);gap:10px}
 .ac-item:last-child{border-bottom:none}
-.ac-item:hover,.ac-item.act{background:rgba(16,185,129,0.12)}
+.ac-item:hover{background:rgba(16,185,129,0.12)}
 .ac-left{display:flex;flex-direction:column;overflow:hidden}
 .ac-left b{color:#ffffff;font-size:14px}
 .ac-left small{color:var(--mu);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -109,7 +98,7 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(-
   <div id="v-verify" class="hide">
     <p class="sub">Enviamos um link de confirmação para o seu e-mail. Clique nele e depois aqui.</p>
     <button class="w" onclick="checkVerified()">Já confirmei</button>
-    <div class="sw"><a onclick="resend()">Reenviar link</a> · <a onclick="auth.signOut()">Sair</a></div>
+    <div class="sw"><a onclick="resend()">Reenviar link</a> · <a onclick="signOutNow()">Sair</a></div>
   </div>
   <div class="msg" id="msg"></div>
 </div></div>
@@ -117,9 +106,9 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(-
 <div id="app" class="hide">
 <header>
   <div class="logo"><span>ALF</span>broker</div>
-  <div class="hr"><span class="live" id="live">● conectando...</span><span id="who"></span>
+  <div class="hr"><span class="live" id="live">● conectando...</span><span id="cloud" style="color:var(--mu)">☁ aguardando</span><span id="who"></span>
     <button class="g" onclick="toggleTheme()">🌗 Tema</button>
-    <button class="g" onclick="auth.signOut()">Sair</button></div>
+    <button class="g" onclick="signOutNow()">Sair</button></div>
 </header>
 <nav>
   <div class="on" onclick="tab('carteira',this)">Minha Carteira</div>
@@ -155,8 +144,7 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(-
   <div class="row" style="margin-bottom:10px">
     <div class="ac-wrap">
       <input id="s-q" placeholder="Digite o código ou nome (ex: M, MX, PETR, TAEE...)" autocomplete="off"
-             oninput="filterAc('s-q','s-ac',false)"
-             onfocus="filterAc('s-q','s-ac',false)"
+             oninput="filterAc('s-q','s-ac',false)" onfocus="filterAc('s-q','s-ac',false)"
              onkeydown="if(event.key==='Enter'){closeAc();search();}">
       <div id="s-ac" class="ac-list hide"></div>
     </div>
@@ -182,41 +170,28 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(-
     <div class="cv-pat"><canvas id="c-stock"></canvas></div>
     <small style="color:var(--mu)">Atualiza a cada 60 s. Passe o mouse no gráfico: veja a data e o valor exato da ação.</small>
   </div>
-
-  <!-- SEÇÃO FAVORITOS -->
   <div id="fav-sec" class="hide">
     <h3 style="margin:18px 0 10px;color:#ffffff">Favoritos</h3>
     <div class="pop" id="fav-list"></div>
   </div>
-
-  <!-- SEÇÃO POPULARES (TOP 21 MAIORES ALTAS) -->
   <h3 style="margin:18px 0 10px">Populares (Top 21 Maiores Altas)</h3>
   <div class="pop" id="pop"></div>
-
-  <!-- SEÇÃO POPULARES (TOP 21 MAIORES QUEDAS) -->
   <h3 style="margin:24px 0 10px">Populares (Top 21 Maiores Quedas)</h3>
   <div class="pop" id="pop-quedas"></div>
 </div>
 </div>
 
-<script>
-/* =================================================================== */
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification, updateProfile, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { initializeFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+/* ============ CONFIGURAÇÕES ============ */
 const BRAPI_TOKEN = "pXaqwKR2nR7gTXLabyzrys";
-/* =================================================================== */
-
-const $ = id => document.getElementById(id);
-const BRL = v => (v || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
-const msg = t => $('msg').textContent = t || '';
-let uid = null, hold = [], favs = [], top21 = [], top21Quedas = [], allStocks = [], charts = {}, unsubs = [], timer = null, cur = '', Q = {}, H = {}, fails = [];
-let idleTimer = null;
-let msgTimer = null;
-
-try {
-  const c = JSON.parse(localStorage.getItem('qcache2') || '{}');
-  Q = c.Q || {}; H = c.H || {};
-  allStocks = JSON.parse(localStorage.getItem('b3_list') || '[]');
-  hold = JSON.parse(localStorage.getItem('local_hold') || '[]');
-} catch (e) {}
+/* ID do banco do Firestore. Seu banco aparece como "default".
+   Se não funcionar, teste trocar por "(default)" (com parênteses). */
+const DB_ID = "default";
+/* ======================================= */
 
 const firebaseConfig = {
   apiKey: "AIzaSyAvEOf4i-2CZ5Xut0AfGdjjhUpUNjac20Q",
@@ -226,84 +201,86 @@ const firebaseConfig = {
   messagingSenderId: "566444089182",
   appId: "1:566444089182:web:be0cdfcd8edd76327f39cf"
 };
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.firestore();
-db.settings({experimentalForceLongPolling: true});
-const col = n => db.collection('users').doc(uid).collection(n);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = initializeFirestore(app, {experimentalForceLongPolling: true}, DB_ID);
+const colRef = n => collection(db, 'users', uid, n);
+const docRef = (n, id) => doc(db, 'users', uid, n, id);
 
-/* ===== CONTROLE DE INATIVIDADE (5 MINUTOS) ===== */
+const $ = id => document.getElementById(id);
+const BRL = v => (v || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
+const msg = t => $('msg').textContent = t || '';
+let uid = null, hold = [], favs = [], top21 = [], top21Quedas = [], allStocks = [], charts = {}, unsubs = [], timer = null, cur = '', Q = {}, H = {}, fails = [];
+let idleTimer = null, msgTimer = null;
+try {
+  const c = JSON.parse(localStorage.getItem('qcache2') || '{}');
+  Q = c.Q || {}; H = c.H || {};
+  allStocks = JSON.parse(localStorage.getItem('b3_list') || '[]');
+} catch (e) {}
+const cloud = (txt, ok) => { $('cloud').textContent = txt; $('cloud').style.color = ok === true ? 'var(--em)' : ok === false ? 'var(--rd)' : 'var(--mu)'; };
+
+/* ===== INATIVIDADE (5 MIN) ===== */
 function resetIdleTimer() {
   if (!uid) return;
   clearTimeout(idleTimer);
-  idleTimer = setTimeout(() => {
-    if (uid) {
-      auth.signOut();
-    }
-  }, 300000);
+  idleTimer = setTimeout(() => { if (uid) signOut(auth); }, 300000);
 }
-
-['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'].forEach(evt => {
-  document.addEventListener(evt, resetIdleTimer, true);
-});
+['mousemove','mousedown','keypress','scroll','touchstart'].forEach(e => document.addEventListener(e, resetIdleTimer, true));
 
 /* ===== AUTH ===== */
 function show(id) { ['v-login','v-reg','v-verify'].forEach(i => $(i).classList.toggle('hide', i !== id)); msg(); }
 const errs = {'auth/invalid-credential':'E-mail ou senha incorretos','auth/email-already-in-use':'E-mail já cadastrado','auth/weak-password':'Senha muito fraca','auth/invalid-email':'E-mail inválido','auth/popup-closed-by-user':'Login cancelado','auth/unauthorized-domain':'Domínio não autorizado no Firebase'};
 const fail = e => msg(errs[e.code] || e.message);
-function googleLogin() { auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(fail); }
-function emailLogin() { auth.signInWithEmailAndPassword($('l-email').value.trim(), $('l-pass').value).catch(fail); }
-function resetPass() { const e = $('l-email').value.trim(); if (!e) return msg('Digite o e-mail acima'); auth.sendPasswordResetEmail(e).then(() => msg('Link de redefinição enviado')).catch(fail); }
+function googleLogin() { signInWithPopup(auth, new GoogleAuthProvider()).catch(fail); }
+function emailLogin() { signInWithEmailAndPassword(auth, $('l-email').value.trim(), $('l-pass').value).catch(fail); }
+function resetPass() { const e = $('l-email').value.trim(); if (!e) return msg('Digite o e-mail acima'); sendPasswordResetEmail(auth, e).then(() => msg('Link de redefinição enviado')).catch(fail); }
 function register() {
   const nome = $('r-nome').value.trim(), email = $('r-email').value.trim(), cel = $('r-cel').value.replace(/\D/g, ''), pass = $('r-pass').value;
   if (!nome || !email || cel.length < 10 || pass.length < 6) return msg('Preencha tudo (celular com DDD, senha mín. 6)');
-  auth.createUserWithEmailAndPassword(email, pass).then(async c => {
-    await c.user.updateProfile({displayName: nome});
-    await db.collection('users').doc(c.user.uid).collection('perfil').doc('dados').set({nome, cel});
-    await c.user.sendEmailVerification();
+  createUserWithEmailAndPassword(auth, email, pass).then(async c => {
+    await updateProfile(c.user, {displayName: nome});
+    await setDoc(doc(db, 'users', c.user.uid, 'perfil', 'dados'), {nome, cel});
+    await sendEmailVerification(c.user);
   }).catch(fail);
 }
-function resend() { auth.currentUser.sendEmailVerification().then(() => msg('Link reenviado')).catch(fail); }
+function resend() { sendEmailVerification(auth.currentUser).then(() => msg('Link reenviado')).catch(fail); }
 function checkVerified() { auth.currentUser.reload().then(() => auth.currentUser.emailVerified ? enter(auth.currentUser) : msg('Ainda não confirmado')); }
-auth.onAuthStateChanged(u => {
+function signOutNow() { signOut(auth); }
+onAuthStateChanged(auth, u => {
   if (!u) { leave(); return; }
   if (u.providerData.some(p => p.providerId === 'password') && !u.emailVerified) { show('v-verify'); return; }
   enter(u);
 });
 function leave() {
-  unsubs.forEach(f => f()); unsubs = []; clearInterval(timer); clearTimeout(idleTimer); clearTimeout(msgTimer); uid = null; hold = []; favs = [];
+  unsubs.forEach(f => f()); unsubs = []; clearInterval(timer); clearTimeout(idleTimer); clearTimeout(msgTimer);
+  uid = null; hold = []; favs = [];
   $('app').classList.add('hide'); $('auth').style.display = 'flex'; show('v-login');
 }
 
-/* ===== TEMPO REAL ===== */
+/* ===== TEMPO REAL (FIRESTORE) ===== */
 function enter(u) {
   if (uid === u.uid) return;
   uid = u.uid; $('auth').style.display = 'none'; $('app').classList.remove('hide');
   $('who').textContent = u.displayName || u.email;
   resetIdleTimer();
-
-  const err = e => { console.error('Firestore:', e); $('live').textContent = '● ERRO NUVEM: ' + (e.code || e.message); $('live').style.color = 'var(--rd)'; }
+  try { hold = JSON.parse(localStorage.getItem('local_hold:' + uid) || '[]'); } catch (e) { hold = []; }
+  const err = e => { console.error('Firestore:', e); cloud('☁ ERRO: ' + (e.code || e.message), false); };
   let first = true;
-
   renderHold();
-
-  unsubs.push(col('cotas').onSnapshot(s => {
+  unsubs.push(onSnapshot(colRef('cotas'), s => {
     hold = s.docs.map(d => ({id: d.id, ...d.data()}));
-    try { localStorage.setItem('local_hold', JSON.stringify(hold)); } catch(e){}
+    try { localStorage.setItem('local_hold:' + uid, JSON.stringify(hold)); } catch (e) {}
+    cloud(s.metadata.fromCache ? '☁ só cache local' : '☁ nuvem OK (' + s.size + ' cotas)', !s.metadata.fromCache);
     renderHold();
     if (first || hold.some(h => !H[h.t])) refresh();
     first = false;
   }, err));
-
-  unsubs.push(col('favoritos').onSnapshot(s => {
+  unsubs.push(onSnapshot(colRef('favoritos'), s => {
     favs = s.docs.map(d => d.id).sort();
-    renderFavs();
-    updateFavBtn();
+    renderFavs(); updateFavBtn();
     if (favs.some(t => !Q[t])) refresh();
   }, err));
-
-  fetchAllB3();
-  refresh();
+  fetchAllB3(); refresh();
   timer = setInterval(refresh, 60000);
 }
 function stamp() {
@@ -318,133 +295,71 @@ function tab(n, el) {
   Object.values(charts).forEach(c => c.resize());
 }
 
-/* ===== AUTOCOMPLETE INSTANTÂNEO & AUTO PREÇO MÉDIO ===== */
+/* ===== AUTOCOMPLETE ===== */
+const getTk = () => (BRAPI_TOKEN && BRAPI_TOKEN !== 'COLE_SEU_TOKEN_AQUI') ? BRAPI_TOKEN : '';
 async function fetchAllB3() {
   try {
     const tk = getTk();
-    const url = `https://brapi.dev/api/quote/list?sortBy=volume&sortOrder=desc${tk ? '&token=' + encodeURIComponent(tk) : ''}`;
-    const r = await fetch(url), j = await r.json();
+    const r = await fetch(`https://brapi.dev/api/quote/list?sortBy=volume&sortOrder=desc${tk ? '&token=' + encodeURIComponent(tk) : ''}`), j = await r.json();
     if (r.ok && j.stocks && j.stocks.length) {
-      allStocks = j.stocks.map(s => ({
-        t: s.stock,
-        n: s.name || s.stock,
-        p: s.close || 0,
-        c: s.change || 0
-      }));
+      allStocks = j.stocks.map(s => ({t: s.stock, n: s.name || s.stock, p: s.close || 0, c: s.change || 0}));
       try { localStorage.setItem('b3_list', JSON.stringify(allStocks)); } catch (e) {}
     }
   } catch (e) { console.error('Erro B3:', e); }
 }
-
 function filterAc(inputId, listId, isHold) {
-  const val = $(inputId).value.trim().toUpperCase();
-  const box = $(listId);
-  
-  if (isHold && /^[A-Z]{4}\d{1,2}$/.test(val)) {
-    autoFillPrice(val);
-  }
-
+  const val = $(inputId).value.trim().toUpperCase(), box = $(listId);
+  if (isHold && /^[A-Z]{4}\d{1,2}$/.test(val)) autoFillPrice(val);
   if (!val) { box.classList.add('hide'); return; }
-
   const starts = allStocks.filter(s => s.t.startsWith(val));
   const includes = allStocks.filter(s => !s.t.startsWith(val) && (s.t.includes(val) || s.n.toUpperCase().includes(val)));
   const matches = [...starts, ...includes].slice(0, 12);
-
   if (!matches.length) { box.classList.add('hide'); return; }
-
   box.innerHTML = matches.map(s => {
-    const d = Q[s.t];
-    const price = d ? d.price : s.p;
-    const pct = d ? (d.pct || 0) : (s.c || 0);
+    const d = Q[s.t], price = d ? d.price : s.p, pct = d ? (d.pct || 0) : (s.c || 0);
     return `<div class="ac-item" onmousedown="pickAc('${s.t}', ${isHold})">
       <div class="ac-left"><b>${s.t}</b><small>${s.n}</small></div>
-      <div class="ac-right"><div>${price ? BRL(price) : ''}</div><small class="${pct >= 0 ? 'up' : 'dn'}">${price ? (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%' : ''}</small></div>
-    </div>`;
+      <div class="ac-right"><div>${price ? BRL(price) : ''}</div><small class="${pct >= 0 ? 'up' : 'dn'}">${price ? (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%' : ''}</small></div></div>`;
   }).join('');
   box.classList.remove('hide');
 }
-
 async function autoFillPrice(ticker) {
   try {
-    if (Q[ticker] && Q[ticker].price) {
-      $('h-p').value = Q[ticker].price.toFixed(2);
-      return;
-    }
+    if (Q[ticker] && Q[ticker].price) { $('h-p').value = Q[ticker].price.toFixed(2); return; }
     const d = await quote(ticker, '1d', '1d');
-    if (d && d.regularMarketPrice) {
-      Q[ticker] = slim(d);
-      $('h-p').value = d.regularMarketPrice.toFixed(2);
-    }
-  } catch(e) {}
+    if (d && d.regularMarketPrice) { Q[ticker] = slim(d); $('h-p').value = d.regularMarketPrice.toFixed(2); }
+  } catch (e) {}
 }
-
 function pickAc(ticker, isHold) {
   closeAc();
-  if (isHold) { 
-    $('h-t').value = ticker; 
-    autoFillPrice(ticker);
-    $('h-q').focus(); 
-  }
-  else { 
-    $('s-q').value = ticker; 
-    search(); 
-  }
+  if (isHold) { $('h-t').value = ticker; autoFillPrice(ticker); $('h-q').focus(); }
+  else { $('s-q').value = ticker; search(); }
 }
-
-function selectStockCard(ticker) {
-  $('s-q').value = ticker;
-  search();
-  window.scrollTo({top: 0, behavior: 'smooth'});
-}
-
+function selectStockCard(ticker) { $('s-q').value = ticker; search(); window.scrollTo({top: 0, behavior: 'smooth'}); }
 function closeAc() { $('s-ac').classList.add('hide'); $('h-ac').classList.add('hide'); }
 document.addEventListener('click', e => { if (!e.target.closest('.ac-wrap')) closeAc(); });
 
-/* ===== COTAÇÕES & TOP 21 (ALTAS E QUEDAS) ===== */
-const getTk = () => (BRAPI_TOKEN && BRAPI_TOKEN !== 'COLE_SEU_TOKEN_AQUI') ? BRAPI_TOKEN : '';
-
+/* ===== COTAÇÕES ===== */
 async function quote(t, range = '1mo', interval = '1d') {
   const tk = getTk();
-  const url = `https://brapi.dev/api/quote/${encodeURIComponent(t)}?range=${range}&interval=${interval}${tk ? '&token=' + encodeURIComponent(tk) : ''}`;
-  const r = await fetch(url), j = await r.json();
+  const r = await fetch(`https://brapi.dev/api/quote/${encodeURIComponent(t)}?range=${range}&interval=${interval}${tk ? '&token=' + encodeURIComponent(tk) : ''}`), j = await r.json();
   if (!r.ok || !j.results || !j.results[0]) throw new Error(j.message || 'Ação não encontrada');
   return j.results[0];
 }
-
 async function fetchTop21() {
   try {
-    const tk = getTk();
-    const r1 = await fetch(`https://brapi.dev/api/quote/list?sortBy=change&sortOrder=desc&limit=21&type=stock${tk ? '&token=' + encodeURIComponent(tk) : ''}`);
-    const j1 = await r1.json();
-    if (r1.ok && j1.stocks && j1.stocks.length) {
-      top21 = j1.stocks.map(s => {
-        Q[s.stock] = {price: s.close, chg: 0, pct: s.change, name: s.name || s.stock};
-        return s.stock;
-      });
-    }
-
-    const r2 = await fetch(`https://brapi.dev/api/quote/list?sortBy=change&sortOrder=asc&limit=21&type=stock${tk ? '&token=' + encodeURIComponent(tk) : ''}`);
-    const j2 = await r2.json();
-    if (r2.ok && j2.stocks && j2.stocks.length) {
-      top21Quedas = j2.stocks.map(s => {
-        Q[s.stock] = {price: s.close, chg: 0, pct: s.change, name: s.name || s.stock};
-        return s.stock;
-      });
-    }
+    const tk = getTk(), t = tk ? '&token=' + encodeURIComponent(tk) : '';
+    const r1 = await fetch(`https://brapi.dev/api/quote/list?sortBy=change&sortOrder=desc&limit=21&type=stock${t}`), j1 = await r1.json();
+    if (r1.ok && j1.stocks && j1.stocks.length) top21 = j1.stocks.map(s => { Q[s.stock] = {price: s.close, chg: 0, pct: s.change, name: s.name || s.stock}; return s.stock; });
+    const r2 = await fetch(`https://brapi.dev/api/quote/list?sortBy=change&sortOrder=asc&limit=21&type=stock${t}`), j2 = await r2.json();
+    if (r2.ok && j2.stocks && j2.stocks.length) top21Quedas = j2.stocks.map(s => { Q[s.stock] = {price: s.close, chg: 0, pct: s.change, name: s.name || s.stock}; return s.stock; });
   } catch (e) {}
 }
-
-const slim = d => ({price:d.regularMarketPrice, chg:d.regularMarketChange, pct:d.regularMarketChangePercent, name:d.shortName || d.longName || ''});
-const hist = d => (d.historicalDataPrice || []).filter(x => x.close != null).map(x => ({t:x.date * 1000, c:x.close}));
-
-async function loadHold(t) {
-  const d = await quote(t, '1mo', '1d'), pts = hist(d);
-  Q[t] = slim(d); if (pts.length) H[t] = pts;
-}
-
+const slim = d => ({price: d.regularMarketPrice, chg: d.regularMarketChange, pct: d.regularMarketChangePercent, name: d.shortName || d.longName || ''});
+const hist = d => (d.historicalDataPrice || []).filter(x => x.close != null).map(x => ({t: x.date * 1000, c: x.close}));
+async function loadHold(t) { const d = await quote(t, '1mo', '1d'), pts = hist(d); Q[t] = slim(d); if (pts.length) H[t] = pts; }
 async function refresh() {
-  const mine = [...new Set(hold.map(h => h.t))];
-  const favOnly = favs.filter(t => !mine.includes(t));
+  const mine = [...new Set(hold.map(h => h.t))], favOnly = favs.filter(t => !mine.includes(t));
   fails = [];
   await Promise.all([
     fetchTop21(),
@@ -458,21 +373,15 @@ async function refresh() {
 
 /* ===== FAVORITOS ===== */
 function updateFavBtn() {
-  const btn = $('btn-fav');
-  if (!btn || !cur) return;
+  const btn = $('btn-fav'); if (!btn || !cur) return;
   const isFav = favs.includes(cur);
-  btn.textContent = isFav ? '★ Favoritado' : '☆ Favoritar';
-  btn.classList.toggle('on', isFav);
+  btn.textContent = isFav ? '★ Favoritado' : '☆ Favoritar'; btn.classList.toggle('on', isFav);
 }
-
 function toggleFav(ticker) {
-  const t = ticker || cur;
-  if (!t || !uid) return;
-  const ref = col('favoritos').doc(t);
-  if (favs.includes(t)) ref.delete();
-  else ref.set({adicionadoEm: Date.now()});
+  const t = ticker || cur; if (!t || !uid) return;
+  if (favs.includes(t)) deleteDoc(docRef('favoritos', t)).catch(e => alert('Erro: ' + (e.code || e.message)));
+  else setDoc(docRef('favoritos', t), {adicionadoEm: Date.now()}).catch(e => alert('Erro: ' + (e.code || e.message)));
 }
-
 function renderFavs() {
   const sec = $('fav-sec');
   if (!favs.length) { sec.classList.add('hide'); return; }
@@ -481,28 +390,23 @@ function renderFavs() {
     const d = Q[t], p = d ? d.pct || 0 : 0;
     return `<div class="card" onclick="selectStockCard('${t}')">
       <button class="rm-fav" title="Remover" onclick="event.stopPropagation();toggleFav('${t}')">✕</button>
-      <b>${t}</b><br>${d ? BRL(d.price) + `<br><span class="${p >= 0 ? 'up' : 'dn'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</span>` : '<small style="color:var(--mu)">carregando...</small>'}
-    </div>`;
+      <b>${t}</b><br>${d ? BRL(d.price) + `<br><span class="${p >= 0 ? 'up' : 'dn'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</span>` : '<small style="color:var(--mu)">carregando...</small>'}</div>`;
   }).join('');
 }
 
 /* ===== MERCADO ===== */
-function lineChart(key, canvasId, labels, data, fmt) {
+function lineChart(key, canvasId, labels, data) {
   const up = data.length < 2 || data[data.length - 1] >= data[0], cor = up ? '#10b981' : '#ef4444';
   if (charts[key]) {
     const c = charts[key]; c.data.labels = labels; c.data.datasets[0].data = data;
     c.data.datasets[0].borderColor = cor; c.data.datasets[0].backgroundColor = cor + '22'; c.update('none'); return;
   }
-  charts[key] = new Chart($(canvasId).getContext('2d'), {type:'line',
-    data:{labels, datasets:[{data, borderColor:cor, backgroundColor:cor + '22', fill:true, tension:.25, pointRadius:2}]},
-    options:{responsive:true, maintainAspectRatio:false, animation:false, plugins:{legend:{display:false}, tooltip:{callbacks:{
-      title: c => 'Data: ' + c[0].label,
-      label: c => {
-        return `Valor: ${BRL(c.raw)}`;
-      }}}}}});
+  charts[key] = new Chart($(canvasId).getContext('2d'), {type: 'line',
+    data: {labels, datasets: [{data, borderColor: cor, backgroundColor: cor + '22', fill: true, tension: .25, pointRadius: 2}]},
+    options: {responsive: true, maintainAspectRatio: false, animation: false, plugins: {legend: {display: false}, tooltip: {callbacks: {
+      title: c => 'Data: ' + c[0].label, label: c => `Valor: ${BRL(c.raw)}`}}}}});
 }
-const fmtT = ms => new Date(ms).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit'});
-
+const fmtT = ms => new Date(ms).toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'});
 async function search(silent) {
   const t = silent === true ? cur : $('s-q').value.trim().toUpperCase(); if (!t) return;
   cur = t; updateFavBtn();
@@ -518,104 +422,48 @@ async function search(silent) {
     $('s-var').className = p >= 0 ? 'up' : 'dn';
     $('s-ab').textContent = BRL(d.regularMarketOpen); $('s-mx').textContent = BRL(d.regularMarketDayHigh);
     $('s-mn').textContent = BRL(d.regularMarketDayLow); $('s-vol').textContent = (d.regularMarketVolume || 0).toLocaleString('pt-BR');
-    lineChart('stock', 'c-stock', h.map(x => fmtT(x.t)), h.map(x => x.c), 'Preço');
+    lineChart('stock', 'c-stock', h.map(x => fmtT(x.t)), h.map(x => x.c));
   } catch (e) { if (silent !== true) $('s-msg').textContent = e.message; }
 }
-
-function closeMarketSearch() {
-  $('s-res').classList.add('hide');
-  $('s-q').value = '';
-  cur = '';
-}
-
-function renderPop() {
-  const list = top21.length ? top21 : ['PETR4','VALE3','ITUB4','BBDC4','TAEE11','WEGE3','BBAS3','ABEV3'];
-  $('pop').innerHTML = list.map(t => {
-    const d = Q[t], p = d ? d.pct || 0 : 0;
-    return `<div class="card" onclick="selectStockCard('${t}')"><b>${t}</b><br>${d ? BRL(d.price) + `<br><span class="${p >= 0 ? 'up' : 'dn'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</span>` : '<small style="color:var(--mu)">carregando...</small>'}</div>`;
-  }).join('');
-}
-
-function renderQuedas() {
-  const list = top21Quedas.length ? top21Quedas : ['PETR4','VALE3','ITUB4','BBDC4','TAEE11','WEGE3','BBAS3','ABEV3'];
-  $('pop-quedas').innerHTML = list.map(t => {
-    const d = Q[t], p = d ? d.pct || 0 : 0;
-    return `<div class="card" onclick="selectStockCard('${t}')"><b>${t}</b><br>${d ? BRL(d.price) + `<br><span class="${p >= 0 ? 'up' : 'dn'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</span>` : '<small style="color:var(--mu)">carregando...</small>'}</div>`;
-  }).join('');
-}
+function closeMarketSearch() { $('s-res').classList.add('hide'); $('s-q').value = ''; cur = ''; }
+const cardsHtml = list => list.map(t => {
+  const d = Q[t], p = d ? d.pct || 0 : 0;
+  return `<div class="card" onclick="selectStockCard('${t}')"><b>${t}</b><br>${d ? BRL(d.price) + `<br><span class="${p >= 0 ? 'up' : 'dn'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</span>` : '<small style="color:var(--mu)">carregando...</small>'}</div>`;
+}).join('');
+const FALLBACK = ['PETR4','VALE3','ITUB4','BBDC4','TAEE11','WEGE3','BBAS3','ABEV3'];
+function renderPop() { $('pop').innerHTML = cardsHtml(top21.length ? top21 : FALLBACK); }
+function renderQuedas() { $('pop-quedas').innerHTML = cardsHtml(top21Quedas.length ? top21Quedas : FALLBACK); }
 
 /* ===== CARTEIRA ===== */
 function saveHold() {
   const t = $('h-t').value.trim().toUpperCase(), q = +$('h-q').value, p = +$('h-p').value, m = $('h-msg');
   if (!t || !(q > 0) || !(p > 0)) { m.style.color = 'var(--rd)'; m.textContent = 'Preencha ticker, quantidade e preço médio.'; return; }
   $('h-t').value = $('h-q').value = $('h-p').value = ''; $('h-t').focus();
-  
-  clearTimeout(msgTimer);
-  m.style.color = 'var(--em)'; 
-  m.textContent = `${t} adicionada.`;
-
-  msgTimer = setTimeout(() => {
-    m.textContent = '';
-  }, 10000);
-
-    const novaCota = {t, q, p};
-  const aviso = setTimeout(() => alert('A cota ' + t + ' NÃO chegou ao servidor em 8 segundos. Veja o topo do painel e o Console (F12).'), 8000);
-  col('cotas').add(novaCota).then(docRef => {
-    clearTimeout(aviso);
-    novaCota.id = docRef.id;
-    if (!hold.some(item => item.id === novaCota.id)) {
-      hold.push(novaCota);
-      try { localStorage.setItem('local_hold', JSON.stringify(hold)); } catch(e){}
-      renderHold();
-    }
-  }).catch(e => {
-    clearTimeout(aviso);
+  clearTimeout(msgTimer); m.style.color = 'var(--em)'; m.textContent = `${t} adicionada.`;
+  msgTimer = setTimeout(() => { m.textContent = ''; }, 10000);
+  const aviso = setTimeout(() => alert('A cota ' + t + ' NÃO chegou ao servidor em 8 segundos. Veja o indicador ☁ no topo.'), 8000);
+  addDoc(colRef('cotas'), {t, q, p}).then(() => clearTimeout(aviso)).catch(e => {
+    clearTimeout(aviso); cloud('☁ ERRO: ' + (e.code || e.message), false);
     alert('A cota ' + t + ' NÃO foi salva na nuvem: ' + (e.code || '') + ' ' + e.message);
   });
 }
-
 function updateQty(id, delta) {
-  const item = hold.find(h => h.id === id);
-  if (!item) return;
-  let newQ = item.q + delta;
-  if (newQ < 1) newQ = 1;
-  item.q = newQ;
-  col('cotas').doc(id).update({q: newQ}).then(() => {
-    try { localStorage.setItem('local_hold', JSON.stringify(hold)); } catch(e){}
-    renderHold();
-  });
+  const item = hold.find(h => h.id === id); if (!item) return;
+  updateDoc(docRef('cotas', id), {q: Math.max(1, item.q + delta)}).catch(e => alert('Erro: ' + (e.code || e.message)));
 }
-
 function setQty(id, val) {
-  const q = parseInt(val);
-  if (isNaN(q) || q < 1) return;
-  const item = hold.find(h => h.id === id);
-  if (!item || item.q === q) return;
-  item.q = q;
-  col('cotas').doc(id).update({q}).then(() => {
-    try { localStorage.setItem('local_hold', JSON.stringify(hold)); } catch(e){}
-    renderHold();
-  });
+  const q = parseInt(val), item = hold.find(h => h.id === id);
+  if (isNaN(q) || q < 1 || !item || item.q === q) return;
+  updateDoc(docRef('cotas', id), {q}).catch(e => alert('Erro: ' + (e.code || e.message)));
 }
-
 function rmHold(id) {
   if (!confirm('Remover esta cota?')) return;
-  col('cotas').doc(id).delete().then(() => {
-    hold = hold.filter(h => h.id !== id);
-    try { localStorage.setItem('local_hold', JSON.stringify(hold)); } catch(e){}
-    renderHold();
-  }).catch(e => {
-    hold = hold.filter(h => h.id !== id);
-    try { localStorage.setItem('local_hold', JSON.stringify(hold)); } catch(e){}
-    renderHold();
-  });
+  deleteDoc(docRef('cotas', id)).catch(e => alert('Erro: ' + (e.code || e.message)));
 }
-
 const priceAt = (t, time) => {
   const a = H[t]; if (!a || !a.length) return null;
-  let v = a[0].c; for (const x of a) { if (x.t <= time) v = a[0].c; else break; } return v;
+  let v = a[0].c; for (const x of a) { if (x.t <= time) v = x.c; else break; } return v;
 };
-
 function renderHold() {
   try {
     let tot = 0, dia = 0, res = 0;
@@ -624,29 +472,19 @@ function renderHold() {
       const v = c * h.q; tot += v; dia += v * pc / 100 / (1 + pc / 100); res += (c - h.p) * h.q;
       return `<tr>
         <td><b>${h.t}</b><br><small style="color:var(--mu)">${d ? d.name : ''}</small></td>
-        <td>${h.q}</td>
-        <td>${BRL(h.p)}</td>
-        <td>${BRL(c)}</td>
-        <td class="${pc >= 0 ? 'up' : 'dn'}">${pc >= 0 ? '+' : ''}${pc.toFixed(2)}%</td>
-        <td>${BRL(v)}</td>
-        <td style="text-align:right">
-          <div style="display:inline-flex;align-items:center;gap:8px">
-            <button class="g" onclick="rmHold('${h.id}')" title="Excluir">✕</button>
-            <div class="qty-ctrl">
-              <button onclick="updateQty('${h.id}', -1)">-</button>
-              <input type="number" min="1" value="${h.q}" onchange="setQty('${h.id}', this.value)">
-              <button onclick="updateQty('${h.id}', 1)">+</button>
-            </div>
-          </div>
-        </td>
-      </tr>`;
+        <td>${h.q}</td><td>${BRL(h.p)}</td><td>${BRL(c)}</td>
+        <td class="${pc >= 0 ? 'up' : 'dn'}">${pc >= 0 ? '+' : ''}${pc.toFixed(2)}%</td><td>${BRL(v)}</td>
+        <td style="text-align:right"><div style="display:inline-flex;align-items:center;gap:8px">
+          <button class="g" onclick="rmHold('${h.id}')" title="Excluir">✕</button>
+          <div class="qty-ctrl"><button onclick="updateQty('${h.id}', -1)">-</button>
+            <input type="number" min="1" value="${h.q}" onchange="setQty('${h.id}', this.value)">
+            <button onclick="updateQty('${h.id}', 1)">+</button></div></div></td></tr>`;
     }).join('') || '<tr><td colspan="7" style="color:var(--mu)">Nenhuma cota adicionada ainda.</td></tr>';
     $('p-tot').textContent = BRL(tot); $('p-dia').textContent = BRL(dia); $('p-dia').className = dia >= 0 ? 'up' : 'dn';
     $('p-res').textContent = BRL(res); $('p-res').className = res >= 0 ? 'up' : 'dn'; $('p-n').textContent = hold.length;
     renderPortCharts();
   } catch (e) { console.error(e); }
 }
-
 function renderPortCharts() {
   const ts = [...new Set(hold.map(h => h.t))], wrap = $('h-charts'), sig = ts.join(',');
   $('pat-card').classList.toggle('hide', !ts.length);
@@ -655,16 +493,20 @@ function renderPortCharts() {
     wrap.innerHTML = ts.map((t, i) => `<div class="card"><h4 style="margin-bottom:10px">${t}</h4><div class="cv"><canvas id="ch-${i}"></canvas></div></div>`).join('');
     wrap.dataset.sig = sig;
   }
-  ts.forEach((t, i) => { const a = H[t] || []; lineChart('h:' + t, 'ch-' + i, a.map(x => fmtT(x.t)), a.map(x => x.c), 'Preço'); });
+  ts.forEach((t, i) => { const a = H[t] || []; lineChart('h:' + t, 'ch-' + i, a.map(x => fmtT(x.t)), a.map(x => x.c)); });
   if (!ts.length) { if (charts.pat) { charts.pat.destroy(); delete charts.pat; } return; }
   const qty = {}; hold.forEach(h => qty[h.t] = (qty[h.t] || 0) + h.q);
   const times = [...new Set(ts.flatMap(t => (H[t] || []).map(x => x.t)))].sort((a, b) => a - b);
   const vals = times.map(time => ts.reduce((s, t) => {
-    const p = priceAt(t, time); const fb = Q[t] && Q[t].price ? Q[t].price : 0;
+    const p = priceAt(t, time), fb = Q[t] && Q[t].price ? Q[t].price : 0;
     return s + qty[t] * (p == null ? fb : p);
   }, 0));
-  lineChart('pat', 'c-pat', times.map(fmtT), vals, 'Patrimônio');
+  lineChart('pat', 'c-pat', times.map(fmtT), vals);
 }
+
+/* funções usadas pelos botões do HTML */
+Object.assign(window, {show, googleLogin, emailLogin, resetPass, register, resend, checkVerified, signOutNow, toggleTheme, tab,
+  filterAc, closeAc, pickAc, search, closeMarketSearch, toggleFav, selectStockCard, saveHold, updateQty, setQty, rmHold});
 </script>
 </body>
 </html>
