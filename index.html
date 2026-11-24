@@ -338,7 +338,7 @@ function filterAc(inputId, listId, isHold) {
   const val = $(inputId).value.trim().toUpperCase();
   const box = $(listId);
   
-  if (isHold && val.length >= 4) {
+  if (isHold && /^[A-Z]{4}\d{1,2}$/.test(val)) {
     autoFillPrice(val);
   }
 
