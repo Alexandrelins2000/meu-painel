@@ -44,7 +44,7 @@ nav .on{color:var(--em);border-color:var(--em);font-weight:600}
 .row{display:flex;gap:10px;flex-wrap:wrap}.row input{margin:0;flex:1;min-width:120px}
 .cv{position:relative;height:160px}
 .cv-pat{position:relative;height:240px}
-.cv-ext{position:relative;height:460px}
+.cv-ext{position:relative;height:360px}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(--tx)}th{color:var(--mu);font-weight:500}
 .pop{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
@@ -54,8 +54,9 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(-
 .pop .rm-fav:hover{color:var(--rd)}
 .close-market{position:absolute;top:16px;right:16px;background:transparent;border:none;color:var(--mu);font-size:18px;cursor:pointer;padding:4px 8px;border-radius:6px}
 .close-market:hover{background:var(--bd);color:var(--rd)}
+.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-@media(max-width:900px){.grid3{grid-template-columns:1fr 1fr}}
+@media(max-width:900px){.grid2{grid-template-columns:1fr}.grid3{grid-template-columns:1fr 1fr}}
 @media(max-width:600px){.grid3{grid-template-columns:1fr}}
 .qty-ctrl{display:inline-flex;align-items:center;gap:4px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:2px}
 .qty-ctrl button{background:transparent;color:var(--tx);border:none;width:24px;height:24px;font-weight:bold;cursor:pointer;border-radius:4px;display:flex;align-items:center;justify-content:center}
@@ -171,18 +172,32 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(-
     <div class="cv-pat"><canvas id="c-stock"></canvas></div>
     <small style="color:var(--mu)">Atualiza a cada 60 s. Passe o mouse no gráfico: veja a data e o valor exato da ação.</small>
   </div>
+
   <div id="fav-sec" class="hide">
     <h3 style="margin:18px 0 10px;color:#ffffff">Favoritos</h3>
     <div class="pop" id="fav-list"></div>
   </div>
-  <div class="card" id="ext-card" style="margin-top:18px">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-      <h4>Top 20 Maiores Altas e Top 20 Maiores Quedas (Variação % no período)</h4>
-      <small id="ext-status" style="color:var(--mu)">Carregando séries...</small>
+
+  <!-- 2 GRÁFICOS ABAIXO DOS FAVORITOS: 10 MAIORES ALTAS E 10 MAIORES QUEDAS -->
+  <div class="grid2" style="margin-top:18px">
+    <div class="card" style="margin-bottom:0">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+        <h4 class="up">Top 10 Maiores Altas (Variação %)</h4>
+        <small id="ext-up-status" style="color:var(--mu)">Carregando...</small>
+      </div>
+      <div class="cv-ext"><canvas id="c-top-altas"></canvas></div>
     </div>
-    <div class="cv-ext"><canvas id="c-extremes"></canvas></div>
+
+    <div class="card" style="margin-bottom:0">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px">
+        <h4 class="dn">Top 10 Maiores Quedas (Variação %)</h4>
+        <small id="ext-dn-status" style="color:var(--mu)">Carregando...</small>
+      </div>
+      <div class="cv-ext"><canvas id="c-top-quedas"></canvas></div>
+    </div>
   </div>
-  <h3 style="margin:18px 0 10px">Populares (Top 20 Maiores Altas)</h3>
+
+  <h3 style="margin:22px 0 10px">Populares (Top 20 Maiores Altas)</h3>
   <div class="pop" id="pop"></div>
   <h3 style="margin:24px 0 10px">Populares (Top 20 Maiores Quedas)</h3>
   <div class="pop" id="pop-quedas"></div>
@@ -227,7 +242,7 @@ try {
 
 const cloud = (txt, ok) => { $('cloud').textContent = txt; $('cloud').style.color = ok === true ? 'var(--em)' : ok === false ? 'var(--rd)' : 'var(--mu)'; };
 
-/* ===== PERSISTÊNCIA LOCAL DE FAVORITOS E CARTEIRA ===== */
+/* ===== PERSISTÊNCIA LOCAL DE FAVORITOS ===== */
 function saveLocalFavs() {
   if (!uid) return;
   try { localStorage.setItem('local_favs:' + uid, JSON.stringify(favs)); } catch (e) {}
@@ -268,8 +283,7 @@ const endLabelsPlugin = {
       const x = Math.min(lastPt.x + 6, chartArea.right - 2);
       let y = Math.max(chartArea.top + 8, Math.min(lastPt.y, chartArea.bottom - 8));
 
-      // Evita sobreposição vertical simples entre rótulos próximos
-      for (let attempt = 0; attempt < 8; attempt++) {
+      for (let attempt = 0; attempt < 10; attempt++) {
         const clash = placed.some(p => Math.abs(p.x - x) < 46 && Math.abs(p.y - y) < 12);
         if (!clash) break;
         y += (attempt % 2 === 0 ? 11 : -11);
@@ -363,7 +377,6 @@ function enter(u) {
 
   unsubs.push(onSnapshot(colRef('favoritos'), s => {
     const cloudFavs = s.docs.map(d => d.id).sort();
-    // Só sobrescreve se vier do servidor ou se já tivermos recebido snapshot válido
     if (!s.metadata.fromCache || favSnapshotReceived || !favs.length) {
       favs = cloudFavs;
       saveLocalFavs();
@@ -388,7 +401,7 @@ function stamp() {
 function toggleTheme() {
   const b = document.body;
   b.dataset.theme = b.dataset.theme === 'dark' ? 'light' : 'dark';
-  renderExtremesChart();
+  renderBothTopCharts();
 }
 function tab(n, el) {
   document.querySelectorAll('nav div').forEach(d => d.classList.remove('on')); el.classList.add('on');
@@ -470,13 +483,17 @@ const slim = d => ({price: d.regularMarketPrice, chg: d.regularMarketChange, pct
 const hist = d => (d.historicalDataPrice || []).filter(x => x.close != null).map(x => ({t: x.date * 1000, c: x.close}));
 async function loadHold(t) { const d = await quote(t, '1mo', '1d'), pts = hist(d); Q[t] = slim(d); if (pts.length) H[t] = pts; }
 
-async function loadExtremesHistory() {
-  const combined = [...new Set([...top20.slice(0, 20), ...top20Quedas.slice(0, 20)])];
+async function loadTop10Histories() {
+  const up10 = top20.slice(0, 10);
+  const dn10 = top20Quedas.slice(0, 10);
+  const combined = [...new Set([...up10, ...dn10])];
   if (!combined.length) return;
-  const missing = combined.filter(t => !H[t] || !H[t].length);
+
+  const missing = combined.filter(t => !H[t] || H[t].length < 2);
   if (missing.length) {
-    $('ext-status').textContent = `Atualizando histórico (${missing.length} ativos)...`;
-    const batchSize = 6;
+    $('ext-up-status').textContent = 'Atualizando...';
+    $('ext-dn-status').textContent = 'Atualizando...';
+    const batchSize = 5;
     for (let i = 0; i < missing.length; i += batchSize) {
       const batch = missing.slice(i, i + batchSize);
       await Promise.all(batch.map(async t => {
@@ -488,8 +505,9 @@ async function loadExtremesHistory() {
         } catch (e) {}
       }));
     }
+    try { localStorage.setItem('qcache2', JSON.stringify({Q, H})); } catch (e) {}
   }
-  renderExtremesChart();
+  renderBothTopCharts();
 }
 
 async function refresh() {
@@ -502,68 +520,62 @@ async function refresh() {
   ]);
   try { localStorage.setItem('qcache2', JSON.stringify({Q, H})); } catch (e) {}
   renderFavs(); renderPop(); renderQuedas(); renderHold(); stamp();
-  loadExtremesHistory();
+  loadTop10Histories();
   if (cur) search(true);
 }
 
-/* ===== GRÁFICO ÚNICO: TOP 20 SUBIDAS + TOP 20 QUEDAS ===== */
-function paletteColor(index, total) {
-  const hue = Math.round((index * 360) / Math.max(total, 1));
-  return `hsl(${hue}, 82%, 60%)`;
-}
+/* ===== 2 GRÁFICOS: TOP 10 ALTAS E TOP 10 QUEDAS ===== */
+const DISTINCT_COLORS = [
+  '#10b981', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6',
+  '#06b6d4', '#f97316', '#84cc16', '#e11d48', '#14b8a6'
+];
 
-function renderExtremesChart() {
-  const risers = top20.slice(0, 20);
-  const fallers = top20Quedas.slice(0, 20);
-  const allTickers = [...new Set([...risers, ...fallers])].filter(t => H[t] && H[t].length > 1);
-  const canvas = $('c-extremes');
+function renderMultiLineChart(chartKey, canvasId, statusId, tickers, tagLabel) {
+  const validTickers = tickers.slice(0, 10).filter(t => H[t] && H[t].length > 1);
+  const canvas = $(canvasId);
   if (!canvas) return;
 
-  if (!allTickers.length) {
-    $('ext-status').textContent = 'Aguardando dados históricos da B3...';
+  if (!validTickers.length) {
+    $(statusId).textContent = 'Aguardando histórico...';
     return;
   }
 
-  const allTimes = [...new Set(allTickers.flatMap(t => H[t].map(x => x.t)))].sort((a, b) => a - b);
+  const allTimes = [...new Set(validTickers.flatMap(t => H[t].map(x => x.t)))].sort((a, b) => a - b);
   const labels = allTimes.map(fmtT);
 
-  const datasets = allTickers.map((t, idx) => {
+  const datasets = validTickers.map((t, idx) => {
     const pts = H[t];
     const baseVal = pts[0]?.c || 1;
     const mapByTime = new Map(pts.map(x => [x.t, x.c]));
     let lastKnown = baseVal;
     const series = allTimes.map(ms => {
-      if (mapByTime.has(ms)) {
-        lastKnown = mapByTime.get(ms);
-      }
+      if (mapByTime.has(ms)) lastKnown = mapByTime.get(ms);
       return Number((((lastKnown - baseVal) / baseVal) * 100).toFixed(2));
     });
-    const color = paletteColor(idx, allTickers.length);
-    const groupTag = risers.includes(t) && fallers.includes(t) ? 'Alta/Queda' : risers.includes(t) ? 'Top 20 Alta' : 'Top 20 Queda';
+    const color = DISTINCT_COLORS[idx % DISTINCT_COLORS.length];
     return {
       label: t,
-      _groupTag: groupTag,
       data: series,
       borderColor: color,
       backgroundColor: color,
-      borderWidth: 1.8,
+      borderWidth: 2,
       pointRadius: 0,
       pointHoverRadius: 4,
       fill: false,
-      tension: 0.2
+      tension: 0.22
     };
   });
 
-  $('ext-status').textContent = `${allTickers.length} linhas exibidas (${risers.length} altas + ${fallers.length} quedas)`;
+  $(statusId).textContent = `${validTickers.length} ações (${tagLabel})`;
 
-  if (charts.extremes) {
-    charts.extremes.data.labels = labels;
-    charts.extremes.data.datasets = datasets;
-    charts.extremes.update('none');
+  if (charts[chartKey]) {
+    charts[chartKey].data.labels = labels;
+    charts[chartKey].data.datasets = datasets;
+    charts[chartKey].update('none');
     return;
   }
 
-  charts.extremes = new Chart(canvas.getContext('2d'), {
+  charts[chartKey] = new Chart(canvas.getContext('2d'), {
     type: 'line',
     data: { labels, datasets },
     options: {
@@ -579,14 +591,14 @@ function renderExtremesChart() {
             title: items => 'Data: ' + items[0].label,
             label: ctx => {
               const v = ctx.raw;
-              return ` ${ctx.dataset.label} (${ctx.dataset._groupTag}): ${v >= 0 ? '+' : ''}${v}%`;
+              return ` ${ctx.dataset.label}: ${v >= 0 ? '+' : ''}${v}%`;
             }
           }
         }
       },
       scales: {
         x: {
-          ticks: { color: '#9ca3af', maxTicksLimit: 10 },
+          ticks: { color: '#9ca3af', maxTicksLimit: 8 },
           grid: { color: 'rgba(156,163,175,0.12)' }
         },
         y: {
@@ -596,8 +608,13 @@ function renderExtremesChart() {
       }
     }
   });
-  charts.extremes.config._enableEndLabels = true;
-  charts.extremes.update('none');
+  charts[chartKey].config._enableEndLabels = true;
+  charts[chartKey].update('none');
+}
+
+function renderBothTopCharts() {
+  renderMultiLineChart('topAltas', 'c-top-altas', 'ext-up-status', top20, 'Top 10 Altas');
+  renderMultiLineChart('topQuedas', 'c-top-quedas', 'ext-dn-status', top20Quedas, 'Top 10 Quedas');
 }
 
 /* ===== FAVORITOS ===== */
