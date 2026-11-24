@@ -227,8 +227,9 @@ const firebaseConfig = {
   appId: "1:566444089182:web:be0cdfcd8edd76327f39cf"
 };
 firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth(), db = firebase.firestore();
-db.settings({experimentalForceLongPolling: true, merge: true});
+const auth = firebase.auth();
+const db = firebase.firestore();
+db.settings({experimentalForceLongPolling: true});
 const col = n => db.collection('users').doc(uid).collection(n);
 
 /* ===== CONTROLE DE INATIVIDADE (5 MINUTOS) ===== */
