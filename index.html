@@ -44,7 +44,7 @@ nav .on{color:var(--em);border-color:var(--em);font-weight:600}
 .row{display:flex;gap:10px;flex-wrap:wrap}.row input{margin:0;flex:1;min-width:120px}
 .cv{position:relative;height:160px}
 .cv-pat{position:relative;height:240px}
-.cv-ext{position:relative;height:360px}
+.cv-ext{position:relative;height:380px}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(--tx)}th{color:var(--mu);font-weight:500}
 .pop{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
@@ -54,9 +54,9 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(-
 .pop .rm-fav:hover{color:var(--rd)}
 .close-market{position:absolute;top:16px;right:16px;background:transparent;border:none;color:var(--mu);font-size:18px;cursor:pointer;padding:4px 8px;border-radius:6px}
 .close-market:hover{background:var(--bd);color:var(--rd)}
-.grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+.stack{display:flex;flex-direction:column;gap:16px}
 .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-@media(max-width:900px){.grid2{grid-template-columns:1fr}.grid3{grid-template-columns:1fr 1fr}}
+@media(max-width:900px){.grid3{grid-template-columns:1fr 1fr}}
 @media(max-width:600px){.grid3{grid-template-columns:1fr}}
 .qty-ctrl{display:inline-flex;align-items:center;gap:4px;background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:2px}
 .qty-ctrl button{background:transparent;color:var(--tx);border:none;width:24px;height:24px;font-weight:bold;cursor:pointer;border-radius:4px;display:flex;align-items:center;justify-content:center}
@@ -178,28 +178,28 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(-
     <div class="pop" id="fav-list"></div>
   </div>
 
-  <!-- 2 GRÁFICOS ABAIXO DOS FAVORITOS: 10 MAIORES ALTAS E 10 MAIORES QUEDAS -->
-  <div class="grid2" style="margin-top:18px">
+  <!-- 2 GRÁFICOS EMPILHADOS ABAIXO DOS FAVORITOS -->
+  <div class="stack" style="margin-top:18px">
     <div class="card" style="margin-bottom:0">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px">
-        <h4 class="up">Top 10 Maiores Altas (Variação %)</h4>
-        <small id="ext-up-status" style="color:var(--mu)">Carregando...</small>
+        <h4>Ações — 5 Maiores Altas e 5 Maiores Quedas</h4>
+        <small id="st-acoes" style="color:var(--mu)">Carregando...</small>
       </div>
-      <div class="cv-ext"><canvas id="c-top-altas"></canvas></div>
+      <div class="cv-ext"><canvas id="c-acoes-top5"></canvas></div>
     </div>
 
     <div class="card" style="margin-bottom:0">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px">
-        <h4 class="dn">Top 10 Maiores Quedas (Variação %)</h4>
-        <small id="ext-dn-status" style="color:var(--mu)">Carregando...</small>
+        <h4>FIIs, ETFs e BDRs — 5 Maiores Altas e 5 Maiores Quedas</h4>
+        <small id="st-fii-etf-bdr" style="color:var(--mu)">Carregando...</small>
       </div>
-      <div class="cv-ext"><canvas id="c-top-quedas"></canvas></div>
+      <div class="cv-ext"><canvas id="c-fii-etf-bdr-top5"></canvas></div>
     </div>
   </div>
 
-  <h3 style="margin:22px 0 10px">Populares (Top 20 Maiores Altas)</h3>
+  <h3 style="margin:22px 0 10px">Populares (Top 21 Maiores Altas)</h3>
   <div class="pop" id="pop"></div>
-  <h3 style="margin:24px 0 10px">Populares (Top 20 Maiores Quedas)</h3>
+  <h3 style="margin:24px 0 10px">Populares (Top 21 Maiores Quedas)</h3>
   <div class="pop" id="pop-quedas"></div>
 </div>
 </div>
@@ -231,8 +231,9 @@ const docRef = (n, id) => doc(db, 'users', uid, n, id);
 const $ = id => document.getElementById(id);
 const BRL = v => (v || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
 const msg = t => $('msg').textContent = t || '';
-let uid = null, hold = [], favs = [], top20 = [], top20Quedas = [], allStocks = [], charts = {}, unsubs = [], timer = null, cur = '', Q = {}, H = {}, fails = [];
+let uid = null, hold = [], favs = [], top21 = [], top21Quedas = [], allStocks = [], charts = {}, unsubs = [], timer = null, cur = '', Q = {}, H = {}, fails = [];
 let idleTimer = null, msgTimer = null;
+let acoesTop5List = [], fiiEtfBdrTop5List = [];
 
 try {
   const c = JSON.parse(localStorage.getItem('qcache2') || '{}');
@@ -283,8 +284,8 @@ const endLabelsPlugin = {
       const x = Math.min(lastPt.x + 6, chartArea.right - 2);
       let y = Math.max(chartArea.top + 8, Math.min(lastPt.y, chartArea.bottom - 8));
 
-      for (let attempt = 0; attempt < 10; attempt++) {
-        const clash = placed.some(p => Math.abs(p.x - x) < 46 && Math.abs(p.y - y) < 12);
+      for (let attempt = 0; attempt < 12; attempt++) {
+        const clash = placed.some(p => Math.abs(p.x - x) < 48 && Math.abs(p.y - y) < 12);
         if (!clash) break;
         y += (attempt % 2 === 0 ? 11 : -11);
         y = Math.max(chartArea.top + 8, Math.min(y, chartArea.bottom - 8));
@@ -401,7 +402,7 @@ function stamp() {
 function toggleTheme() {
   const b = document.body;
   b.dataset.theme = b.dataset.theme === 'dark' ? 'light' : 'dark';
-  renderBothTopCharts();
+  renderStackedCharts();
 }
 function tab(n, el) {
   document.querySelectorAll('nav div').forEach(d => d.classList.remove('on')); el.classList.add('on');
@@ -416,8 +417,16 @@ async function fetchAllB3() {
     const tk = getTk();
     const r = await fetch(`https://brapi.dev/api/quote/list?sortBy=volume&sortOrder=desc${tk ? '&token=' + encodeURIComponent(tk) : ''}`), j = await r.json();
     if (r.ok && j.stocks && j.stocks.length) {
-      allStocks = j.stocks.map(s => ({t: s.stock, n: s.name || s.stock, p: s.close || 0, c: s.change || 0}));
+      allStocks = j.stocks.map(s => ({
+        t: s.stock,
+        n: s.name || s.stock,
+        p: s.close || 0,
+        c: s.change || 0,
+        type: s.type || ''
+      }));
       try { localStorage.setItem('b3_list', JSON.stringify(allStocks)); } catch (e) {}
+      buildTop5Lists();
+      loadStackedHistories();
     }
   } catch (e) { console.error('Erro B3:', e); }
 }
@@ -460,39 +469,55 @@ async function quote(t, range = '1mo', interval = '1d') {
   if (!r.ok || !j.results || !j.results[0]) throw new Error(j.message || 'Ação não encontrada');
   return j.results[0];
 }
-async function fetchTop20() {
+async function fetchTop21() {
   try {
     const tk = getTk(), t = tk ? '&token=' + encodeURIComponent(tk) : '';
-    const r1 = await fetch(`https://brapi.dev/api/quote/list?sortBy=change&sortOrder=desc&limit=20&type=stock${t}`), j1 = await r1.json();
-    if (r1.ok && j1.stocks && j1.stocks.length) {
-      top20 = j1.stocks.slice(0, 20).map(s => {
-        Q[s.stock] = {price: s.close, chg: 0, pct: s.change, name: s.name || s.stock};
-        return s.stock;
-      });
-    }
-    const r2 = await fetch(`https://brapi.dev/api/quote/list?sortBy=change&sortOrder=asc&limit=20&type=stock${t}`), j2 = await r2.json();
-    if (r2.ok && j2.stocks && j2.stocks.length) {
-      top20Quedas = j2.stocks.slice(0, 20).map(s => {
-        Q[s.stock] = {price: s.close, chg: 0, pct: s.change, name: s.name || s.stock};
-        return s.stock;
-      });
-    }
+    const r1 = await fetch(`https://brapi.dev/api/quote/list?sortBy=change&sortOrder=desc&limit=21&type=stock${t}`), j1 = await r1.json();
+    if (r1.ok && j1.stocks && j1.stocks.length) top21 = j1.stocks.map(s => { Q[s.stock] = {price: s.close, chg: 0, pct: s.change, name: s.name || s.stock}; return s.stock; });
+    const r2 = await fetch(`https://brapi.dev/api/quote/list?sortBy=change&sortOrder=asc&limit=21&type=stock${t}`), j2 = await r2.json();
+    if (r2.ok && j2.stocks && j2.stocks.length) top21Quedas = j2.stocks.map(s => { Q[s.stock] = {price: s.close, chg: 0, pct: s.change, name: s.name || s.stock}; return s.stock; });
   } catch (e) {}
 }
+
+function isFiiEtfOrBdr(item) {
+  const tk = (item.t || '').toUpperCase();
+  const tp = (item.type || '').toLowerCase();
+  if (tp.includes('fund') || tp.includes('fii') || tp.includes('etf') || tp.includes('bdr')) return true;
+  // BDRs costumam terminar em 32, 33, 34, 35; FIIs/ETFs em 11 (excluindo units de bancos comuns se quiser, mas mantém 11)
+  return /(11|32|33|34|35)$/.test(tk);
+}
+
+function buildTop5Lists() {
+  const pool = allStocks
+    .filter(s => typeof s.c === 'number' && !Number.isNaN(s.c) && /^[A-Z]{4}\d{1,2}$/.test(s.t))
+    .map(s => {
+      if (!Q[s.t]) Q[s.t] = { price: s.p || 0, chg: 0, pct: s.c || 0, name: s.n || s.t };
+      return s;
+    });
+
+  const acoes = pool.filter(s => !isFiiEtfOrBdr(s));
+  const fiiEtfBdr = pool.filter(s => isFiiEtfOrBdr(s));
+
+  const acoesAltas = [...acoes].sort((a, b) => b.c - a.c).slice(0, 5).map(s => s.t);
+  const acoesQuedas = [...acoes].sort((a, b) => a.c - b.c).slice(0, 5).map(s => s.t);
+  acoesTop5List = [...new Set([...acoesAltas, ...acoesQuedas])];
+
+  const mAltas = [...fiiEtfBdr].sort((a, b) => b.c - a.c).slice(0, 5).map(s => s.t);
+  const mQuedas = [...fiiEtfBdr].sort((a, b) => a.c - b.c).slice(0, 5).map(s => s.t);
+  fiiEtfBdrTop5List = [...new Set([...mAltas, ...mQuedas])];
+}
+
 const slim = d => ({price: d.regularMarketPrice, chg: d.regularMarketChange, pct: d.regularMarketChangePercent, name: d.shortName || d.longName || ''});
 const hist = d => (d.historicalDataPrice || []).filter(x => x.close != null).map(x => ({t: x.date * 1000, c: x.close}));
 async function loadHold(t) { const d = await quote(t, '1mo', '1d'), pts = hist(d); Q[t] = slim(d); if (pts.length) H[t] = pts; }
 
-async function loadTop10Histories() {
-  const up10 = top20.slice(0, 10);
-  const dn10 = top20Quedas.slice(0, 10);
-  const combined = [...new Set([...up10, ...dn10])];
+async function loadStackedHistories() {
+  const combined = [...new Set([...acoesTop5List, ...fiiEtfBdrTop5List])];
   if (!combined.length) return;
-
   const missing = combined.filter(t => !H[t] || H[t].length < 2);
   if (missing.length) {
-    $('ext-up-status').textContent = 'Atualizando...';
-    $('ext-dn-status').textContent = 'Atualizando...';
+    $('st-acoes').textContent = 'Atualizando...';
+    $('st-fii-etf-bdr').textContent = 'Atualizando...';
     const batchSize = 5;
     for (let i = 0; i < missing.length; i += batchSize) {
       const batch = missing.slice(i, i + batchSize);
@@ -507,43 +532,44 @@ async function loadTop10Histories() {
     }
     try { localStorage.setItem('qcache2', JSON.stringify({Q, H})); } catch (e) {}
   }
-  renderBothTopCharts();
+  renderStackedCharts();
 }
 
 async function refresh() {
   const mine = [...new Set(hold.map(h => h.t))], favOnly = favs.filter(t => !mine.includes(t));
   fails = [];
   await Promise.all([
-    fetchTop20(),
+    fetchTop21(),
     ...mine.map(t => loadHold(t).catch(() => fails.push(t))),
     ...favOnly.map(t => quote(t, '5d', '1d').then(d => Q[t] = slim(d)).catch(() => {}))
   ]);
+  buildTop5Lists();
   try { localStorage.setItem('qcache2', JSON.stringify({Q, H})); } catch (e) {}
   renderFavs(); renderPop(); renderQuedas(); renderHold(); stamp();
-  loadTop10Histories();
+  loadStackedHistories();
   if (cur) search(true);
 }
 
-/* ===== 2 GRÁFICOS: TOP 10 ALTAS E TOP 10 QUEDAS ===== */
-const DISTINCT_COLORS = [
+/* ===== 2 GRÁFICOS EMPILHADOS (5 ALTAS + 5 QUEDAS CADA) ===== */
+const LINE_COLORS = [
   '#10b981', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6',
-  '#06b6d4', '#f97316', '#84cc16', '#e11d48', '#14b8a6'
+  '#ef4444', '#06b6d4', '#f97316', '#84cc16', '#e11d48'
 ];
 
-function renderMultiLineChart(chartKey, canvasId, statusId, tickers, tagLabel) {
-  const validTickers = tickers.slice(0, 10).filter(t => H[t] && H[t].length > 1);
+function renderGroupTop5Chart(chartKey, canvasId, statusId, tickers) {
+  const valid = tickers.slice(0, 10).filter(t => H[t] && H[t].length > 1);
   const canvas = $(canvasId);
   if (!canvas) return;
 
-  if (!validTickers.length) {
-    $(statusId).textContent = 'Aguardando histórico...';
+  if (!valid.length) {
+    $(statusId).textContent = 'Aguardando dados históricos...';
     return;
   }
 
-  const allTimes = [...new Set(validTickers.flatMap(t => H[t].map(x => x.t)))].sort((a, b) => a - b);
+  const allTimes = [...new Set(valid.flatMap(t => H[t].map(x => x.t)))].sort((a, b) => a - b);
   const labels = allTimes.map(fmtT);
 
-  const datasets = validTickers.map((t, idx) => {
+  const datasets = valid.map((t, idx) => {
     const pts = H[t];
     const baseVal = pts[0]?.c || 1;
     const mapByTime = new Map(pts.map(x => [x.t, x.c]));
@@ -552,7 +578,7 @@ function renderMultiLineChart(chartKey, canvasId, statusId, tickers, tagLabel) {
       if (mapByTime.has(ms)) lastKnown = mapByTime.get(ms);
       return Number((((lastKnown - baseVal) / baseVal) * 100).toFixed(2));
     });
-    const color = DISTINCT_COLORS[idx % DISTINCT_COLORS.length];
+    const color = LINE_COLORS[idx % LINE_COLORS.length];
     return {
       label: t,
       data: series,
@@ -566,7 +592,7 @@ function renderMultiLineChart(chartKey, canvasId, statusId, tickers, tagLabel) {
     };
   });
 
-  $(statusId).textContent = `${validTickers.length} ações (${tagLabel})`;
+  $(statusId).textContent = `${valid.length} ativos (5 altas + 5 quedas)`;
 
   if (charts[chartKey]) {
     charts[chartKey].data.labels = labels;
@@ -589,16 +615,13 @@ function renderMultiLineChart(chartKey, canvasId, statusId, tickers, tagLabel) {
         tooltip: {
           callbacks: {
             title: items => 'Data: ' + items[0].label,
-            label: ctx => {
-              const v = ctx.raw;
-              return ` ${ctx.dataset.label}: ${v >= 0 ? '+' : ''}${v}%`;
-            }
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.raw >= 0 ? '+' : ''}${ctx.raw}%`
           }
         }
       },
       scales: {
         x: {
-          ticks: { color: '#9ca3af', maxTicksLimit: 8 },
+          ticks: { color: '#9ca3af', maxTicksLimit: 10 },
           grid: { color: 'rgba(156,163,175,0.12)' }
         },
         y: {
@@ -612,9 +635,9 @@ function renderMultiLineChart(chartKey, canvasId, statusId, tickers, tagLabel) {
   charts[chartKey].update('none');
 }
 
-function renderBothTopCharts() {
-  renderMultiLineChart('topAltas', 'c-top-altas', 'ext-up-status', top20, 'Top 10 Altas');
-  renderMultiLineChart('topQuedas', 'c-top-quedas', 'ext-dn-status', top20Quedas, 'Top 10 Quedas');
+function renderStackedCharts() {
+  renderGroupTop5Chart('acoesTop5', 'c-acoes-top5', 'st-acoes', acoesTop5List);
+  renderGroupTop5Chart('fiiEtfBdrTop5', 'c-fii-etf-bdr-top5', 'st-fii-etf-bdr', fiiEtfBdrTop5List);
 }
 
 /* ===== FAVORITOS ===== */
@@ -689,8 +712,8 @@ const cardsHtml = list => list.map(t => {
   return `<div class="card" onclick="selectStockCard('${t}')"><b>${t}</b><br>${d ? BRL(d.price) + `<br><span class="${p >= 0 ? 'up' : 'dn'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</span>` : '<small style="color:var(--mu)">carregando...</small>'}</div>`;
 }).join('');
 const FALLBACK = ['PETR4','VALE3','ITUB4','BBDC4','TAEE11','WEGE3','BBAS3','ABEV3'];
-function renderPop() { $('pop').innerHTML = cardsHtml(top20.length ? top20.slice(0, 20) : FALLBACK); }
-function renderQuedas() { $('pop-quedas').innerHTML = cardsHtml(top20Quedas.length ? top20Quedas.slice(0, 20) : FALLBACK); }
+function renderPop() { $('pop').innerHTML = cardsHtml(top21.length ? top21 : FALLBACK); }
+function renderQuedas() { $('pop-quedas').innerHTML = cardsHtml(top21Quedas.length ? top21Quedas : FALLBACK); }
 
 /* ===== CARTEIRA ===== */
 function saveHold() {
