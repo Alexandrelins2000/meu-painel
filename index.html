@@ -44,6 +44,7 @@ nav .on{color:var(--em);border-color:var(--em);font-weight:600}
 .row{display:flex;gap:10px;flex-wrap:wrap}.row input{margin:0;flex:1;min-width:120px}
 .cv{position:relative;height:160px}
 .cv-pat{position:relative;height:240px}
+.cv-ext{position:relative;height:460px}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(--tx)}th{color:var(--mu);font-weight:500}
 .pop{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
@@ -174,9 +175,16 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(-
     <h3 style="margin:18px 0 10px;color:#ffffff">Favoritos</h3>
     <div class="pop" id="fav-list"></div>
   </div>
-  <h3 style="margin:18px 0 10px">Populares (Top 21 Maiores Altas)</h3>
+  <div class="card" id="ext-card" style="margin-top:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      <h4>Top 20 Maiores Altas e Top 20 Maiores Quedas (Variação % no período)</h4>
+      <small id="ext-status" style="color:var(--mu)">Carregando séries...</small>
+    </div>
+    <div class="cv-ext"><canvas id="c-extremes"></canvas></div>
+  </div>
+  <h3 style="margin:18px 0 10px">Populares (Top 20 Maiores Altas)</h3>
   <div class="pop" id="pop"></div>
-  <h3 style="margin:24px 0 10px">Populares (Top 21 Maiores Quedas)</h3>
+  <h3 style="margin:24px 0 10px">Populares (Top 20 Maiores Quedas)</h3>
   <div class="pop" id="pop-quedas"></div>
 </div>
 </div>
@@ -184,12 +192,10 @@ th,td{padding:10px;text-align:left;border-bottom:1px solid var(--bd);color:var(-
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification, updateProfile, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import { initializeFirestore, collection, doc, addDoc, setDoc, updateDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { initializeFirestore, collection, doc, setDoc, updateDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 /* ============ CONFIGURAÇÕES ============ */
 const BRAPI_TOKEN = "pXaqwKR2nR7gTXLabyzrys";
-/* ID do banco do Firestore. Seu banco aparece como "default".
-   Se não funcionar, teste trocar por "(default)" (com parênteses). */
 const DB_ID = "default";
 /* ======================================= */
 
@@ -210,14 +216,74 @@ const docRef = (n, id) => doc(db, 'users', uid, n, id);
 const $ = id => document.getElementById(id);
 const BRL = v => (v || 0).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
 const msg = t => $('msg').textContent = t || '';
-let uid = null, hold = [], favs = [], top21 = [], top21Quedas = [], allStocks = [], charts = {}, unsubs = [], timer = null, cur = '', Q = {}, H = {}, fails = [];
+let uid = null, hold = [], favs = [], top20 = [], top20Quedas = [], allStocks = [], charts = {}, unsubs = [], timer = null, cur = '', Q = {}, H = {}, fails = [];
 let idleTimer = null, msgTimer = null;
+
 try {
   const c = JSON.parse(localStorage.getItem('qcache2') || '{}');
   Q = c.Q || {}; H = c.H || {};
   allStocks = JSON.parse(localStorage.getItem('b3_list') || '[]');
 } catch (e) {}
+
 const cloud = (txt, ok) => { $('cloud').textContent = txt; $('cloud').style.color = ok === true ? 'var(--em)' : ok === false ? 'var(--rd)' : 'var(--mu)'; };
+
+/* ===== PERSISTÊNCIA LOCAL DE FAVORITOS E CARTEIRA ===== */
+function saveLocalFavs() {
+  if (!uid) return;
+  try { localStorage.setItem('local_favs:' + uid, JSON.stringify(favs)); } catch (e) {}
+}
+function loadLocalFavs() {
+  if (!uid) return [];
+  try { return JSON.parse(localStorage.getItem('local_favs:' + uid) || '[]').sort(); } catch (e) { return []; }
+}
+
+/* ===== PLUGIN DE RÓTULOS NAS PONTAS DAS LINHAS ===== */
+const endLabelsPlugin = {
+  id: 'endLabelsPlugin',
+  afterDatasetsDraw(chart) {
+    if (chart.config._enableEndLabels !== true) return;
+    const { ctx, chartArea } = chart;
+    if (!chartArea) return;
+    ctx.save();
+    ctx.font = 'bold 11px "Segoe UI", system-ui, sans-serif';
+    ctx.textBaseline = 'middle';
+
+    const placed = [];
+    chart.data.datasets.forEach((ds, idx) => {
+      const meta = chart.getDatasetMeta(idx);
+      if (!meta || meta.hidden || !meta.data || !meta.data.length) return;
+
+      let lastPt = null;
+      for (let i = meta.data.length - 1; i >= 0; i--) {
+        const pt = meta.data[i];
+        if (pt && Number.isFinite(pt.x) && Number.isFinite(pt.y)) {
+          lastPt = pt;
+          break;
+        }
+      }
+      if (!lastPt) return;
+
+      const label = ds.label || '';
+      const color = typeof ds.borderColor === 'string' ? ds.borderColor : '#ffffff';
+      const x = Math.min(lastPt.x + 6, chartArea.right - 2);
+      let y = Math.max(chartArea.top + 8, Math.min(lastPt.y, chartArea.bottom - 8));
+
+      // Evita sobreposição vertical simples entre rótulos próximos
+      for (let attempt = 0; attempt < 8; attempt++) {
+        const clash = placed.some(p => Math.abs(p.x - x) < 46 && Math.abs(p.y - y) < 12);
+        if (!clash) break;
+        y += (attempt % 2 === 0 ? 11 : -11);
+        y = Math.max(chartArea.top + 8, Math.min(y, chartArea.bottom - 8));
+      }
+      placed.push({ x, y });
+
+      ctx.fillStyle = color;
+      ctx.fillText(label, x, y);
+    });
+    ctx.restore();
+  }
+};
+Chart.register(endLabelsPlugin);
 
 /* ===== INATIVIDADE (5 MIN) ===== */
 function resetIdleTimer() {
@@ -246,49 +312,84 @@ function register() {
 function resend() { sendEmailVerification(auth.currentUser).then(() => msg('Link reenviado')).catch(fail); }
 function checkVerified() { auth.currentUser.reload().then(() => auth.currentUser.emailVerified ? enter(auth.currentUser) : msg('Ainda não confirmado')); }
 function signOutNow() { signOut(auth); }
+
 onAuthStateChanged(auth, u => {
   if (!u) { leave(); return; }
   if (u.providerData.some(p => p.providerId === 'password') && !u.emailVerified) { show('v-verify'); return; }
   enter(u);
 });
+
 function leave() {
   unsubs.forEach(f => f()); unsubs = []; clearInterval(timer); clearTimeout(idleTimer); clearTimeout(msgTimer);
   uid = null; hold = []; favs = [];
   $('app').classList.add('hide'); $('auth').style.display = 'flex'; show('v-login');
 }
 
-/* ===== TEMPO REAL (FIRESTORE) ===== */
+/* ===== TEMPO REAL (FIRESTORE + CACHE LOCAL) ===== */
 function enter(u) {
-  if (uid === u.uid) return;
-  uid = u.uid; $('auth').style.display = 'none'; $('app').classList.remove('hide');
+  if (uid === u.uid && unsubs.length) return;
+  unsubs.forEach(f => f()); unsubs = [];
+  uid = u.uid;
+  $('auth').style.display = 'none';
+  $('app').classList.remove('hide');
   $('who').textContent = u.displayName || u.email;
   resetIdleTimer();
+
   try { hold = JSON.parse(localStorage.getItem('local_hold:' + uid) || '[]'); } catch (e) { hold = []; }
-  const err = e => { console.error('Firestore:', e); cloud('☁ ERRO: ' + (e.code || e.message), false); };
-  let first = true;
+  favs = loadLocalFavs();
+
+  const err = e => {
+    console.error('Firestore:', e);
+    cloud('☁ cache local (' + (e.code || 'offline') + ')', false);
+    renderFavs();
+    updateFavBtn();
+  };
+
+  let firstHold = true;
+  let favSnapshotReceived = false;
+
   renderHold();
+  renderFavs();
+  updateFavBtn();
+
   unsubs.push(onSnapshot(colRef('cotas'), s => {
     hold = s.docs.map(d => ({id: d.id, ...d.data()}));
     try { localStorage.setItem('local_hold:' + uid, JSON.stringify(hold)); } catch (e) {}
-    cloud(s.metadata.fromCache ? '☁ só cache local' : '☁ nuvem OK (' + s.size + ' cotas)', !s.metadata.fromCache);
+    cloud(s.metadata.fromCache ? '☁ cache local (' + hold.length + ' cotas)' : '☁ nuvem OK (' + s.size + ' cotas)', !s.metadata.fromCache);
     renderHold();
-    if (first || hold.some(h => !H[h.t])) refresh();
-    first = false;
+    if (firstHold || hold.some(h => !H[h.t])) refresh();
+    firstHold = false;
   }, err));
+
   unsubs.push(onSnapshot(colRef('favoritos'), s => {
-    favs = s.docs.map(d => d.id).sort();
-    renderFavs(); updateFavBtn();
+    const cloudFavs = s.docs.map(d => d.id).sort();
+    // Só sobrescreve se vier do servidor ou se já tivermos recebido snapshot válido
+    if (!s.metadata.fromCache || favSnapshotReceived || !favs.length) {
+      favs = cloudFavs;
+      saveLocalFavs();
+    }
+    favSnapshotReceived = true;
+    renderFavs();
+    updateFavBtn();
     if (favs.some(t => !Q[t])) refresh();
   }, err));
-  fetchAllB3(); refresh();
+
+  fetchAllB3();
+  refresh();
+  clearInterval(timer);
   timer = setInterval(refresh, 60000);
 }
+
 function stamp() {
   const l = $('live');
   l.textContent = '● ao vivo · ' + new Date().toLocaleTimeString('pt-BR') + (fails.length ? ' · sem cotação: ' + fails.join(', ') : '');
   l.style.color = fails.length ? 'var(--mu)' : '';
 }
-function toggleTheme() { const b = document.body; b.dataset.theme = b.dataset.theme === 'dark' ? 'light' : 'dark'; }
+function toggleTheme() {
+  const b = document.body;
+  b.dataset.theme = b.dataset.theme === 'dark' ? 'light' : 'dark';
+  renderExtremesChart();
+}
 function tab(n, el) {
   document.querySelectorAll('nav div').forEach(d => d.classList.remove('on')); el.classList.add('on');
   ['carteira','mercado'].forEach(t => $('t-' + t).classList.toggle('hide', t !== n));
@@ -346,29 +447,157 @@ async function quote(t, range = '1mo', interval = '1d') {
   if (!r.ok || !j.results || !j.results[0]) throw new Error(j.message || 'Ação não encontrada');
   return j.results[0];
 }
-async function fetchTop21() {
+async function fetchTop20() {
   try {
     const tk = getTk(), t = tk ? '&token=' + encodeURIComponent(tk) : '';
-    const r1 = await fetch(`https://brapi.dev/api/quote/list?sortBy=change&sortOrder=desc&limit=21&type=stock${t}`), j1 = await r1.json();
-    if (r1.ok && j1.stocks && j1.stocks.length) top21 = j1.stocks.map(s => { Q[s.stock] = {price: s.close, chg: 0, pct: s.change, name: s.name || s.stock}; return s.stock; });
-    const r2 = await fetch(`https://brapi.dev/api/quote/list?sortBy=change&sortOrder=asc&limit=21&type=stock${t}`), j2 = await r2.json();
-    if (r2.ok && j2.stocks && j2.stocks.length) top21Quedas = j2.stocks.map(s => { Q[s.stock] = {price: s.close, chg: 0, pct: s.change, name: s.name || s.stock}; return s.stock; });
+    const r1 = await fetch(`https://brapi.dev/api/quote/list?sortBy=change&sortOrder=desc&limit=20&type=stock${t}`), j1 = await r1.json();
+    if (r1.ok && j1.stocks && j1.stocks.length) {
+      top20 = j1.stocks.slice(0, 20).map(s => {
+        Q[s.stock] = {price: s.close, chg: 0, pct: s.change, name: s.name || s.stock};
+        return s.stock;
+      });
+    }
+    const r2 = await fetch(`https://brapi.dev/api/quote/list?sortBy=change&sortOrder=asc&limit=20&type=stock${t}`), j2 = await r2.json();
+    if (r2.ok && j2.stocks && j2.stocks.length) {
+      top20Quedas = j2.stocks.slice(0, 20).map(s => {
+        Q[s.stock] = {price: s.close, chg: 0, pct: s.change, name: s.name || s.stock};
+        return s.stock;
+      });
+    }
   } catch (e) {}
 }
 const slim = d => ({price: d.regularMarketPrice, chg: d.regularMarketChange, pct: d.regularMarketChangePercent, name: d.shortName || d.longName || ''});
 const hist = d => (d.historicalDataPrice || []).filter(x => x.close != null).map(x => ({t: x.date * 1000, c: x.close}));
 async function loadHold(t) { const d = await quote(t, '1mo', '1d'), pts = hist(d); Q[t] = slim(d); if (pts.length) H[t] = pts; }
+
+async function loadExtremesHistory() {
+  const combined = [...new Set([...top20.slice(0, 20), ...top20Quedas.slice(0, 20)])];
+  if (!combined.length) return;
+  const missing = combined.filter(t => !H[t] || !H[t].length);
+  if (missing.length) {
+    $('ext-status').textContent = `Atualizando histórico (${missing.length} ativos)...`;
+    const batchSize = 6;
+    for (let i = 0; i < missing.length; i += batchSize) {
+      const batch = missing.slice(i, i + batchSize);
+      await Promise.all(batch.map(async t => {
+        try {
+          const d = await quote(t, '1mo', '1d');
+          const pts = hist(d);
+          Q[t] = slim(d);
+          if (pts.length) H[t] = pts;
+        } catch (e) {}
+      }));
+    }
+  }
+  renderExtremesChart();
+}
+
 async function refresh() {
   const mine = [...new Set(hold.map(h => h.t))], favOnly = favs.filter(t => !mine.includes(t));
   fails = [];
   await Promise.all([
-    fetchTop21(),
+    fetchTop20(),
     ...mine.map(t => loadHold(t).catch(() => fails.push(t))),
     ...favOnly.map(t => quote(t, '5d', '1d').then(d => Q[t] = slim(d)).catch(() => {}))
   ]);
   try { localStorage.setItem('qcache2', JSON.stringify({Q, H})); } catch (e) {}
   renderFavs(); renderPop(); renderQuedas(); renderHold(); stamp();
+  loadExtremesHistory();
   if (cur) search(true);
+}
+
+/* ===== GRÁFICO ÚNICO: TOP 20 SUBIDAS + TOP 20 QUEDAS ===== */
+function paletteColor(index, total) {
+  const hue = Math.round((index * 360) / Math.max(total, 1));
+  return `hsl(${hue}, 82%, 60%)`;
+}
+
+function renderExtremesChart() {
+  const risers = top20.slice(0, 20);
+  const fallers = top20Quedas.slice(0, 20);
+  const allTickers = [...new Set([...risers, ...fallers])].filter(t => H[t] && H[t].length > 1);
+  const canvas = $('c-extremes');
+  if (!canvas) return;
+
+  if (!allTickers.length) {
+    $('ext-status').textContent = 'Aguardando dados históricos da B3...';
+    return;
+  }
+
+  const allTimes = [...new Set(allTickers.flatMap(t => H[t].map(x => x.t)))].sort((a, b) => a - b);
+  const labels = allTimes.map(fmtT);
+
+  const datasets = allTickers.map((t, idx) => {
+    const pts = H[t];
+    const baseVal = pts[0]?.c || 1;
+    const mapByTime = new Map(pts.map(x => [x.t, x.c]));
+    let lastKnown = baseVal;
+    const series = allTimes.map(ms => {
+      if (mapByTime.has(ms)) {
+        lastKnown = mapByTime.get(ms);
+      }
+      return Number((((lastKnown - baseVal) / baseVal) * 100).toFixed(2));
+    });
+    const color = paletteColor(idx, allTickers.length);
+    const groupTag = risers.includes(t) && fallers.includes(t) ? 'Alta/Queda' : risers.includes(t) ? 'Top 20 Alta' : 'Top 20 Queda';
+    return {
+      label: t,
+      _groupTag: groupTag,
+      data: series,
+      borderColor: color,
+      backgroundColor: color,
+      borderWidth: 1.8,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      fill: false,
+      tension: 0.2
+    };
+  });
+
+  $('ext-status').textContent = `${allTickers.length} linhas exibidas (${risers.length} altas + ${fallers.length} quedas)`;
+
+  if (charts.extremes) {
+    charts.extremes.data.labels = labels;
+    charts.extremes.data.datasets = datasets;
+    charts.extremes.update('none');
+    return;
+  }
+
+  charts.extremes = new Chart(canvas.getContext('2d'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: false,
+      layout: { padding: { right: 64, top: 8, bottom: 4 } },
+      interaction: { mode: 'nearest', axis: 'x', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: items => 'Data: ' + items[0].label,
+            label: ctx => {
+              const v = ctx.raw;
+              return ` ${ctx.dataset.label} (${ctx.dataset._groupTag}): ${v >= 0 ? '+' : ''}${v}%`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: '#9ca3af', maxTicksLimit: 10 },
+          grid: { color: 'rgba(156,163,175,0.12)' }
+        },
+        y: {
+          ticks: { color: '#9ca3af', callback: v => (v > 0 ? '+' : '') + v + '%' },
+          grid: { color: 'rgba(156,163,175,0.12)' }
+        }
+      }
+    }
+  });
+  charts.extremes.config._enableEndLabels = true;
+  charts.extremes.update('none');
 }
 
 /* ===== FAVORITOS ===== */
@@ -379,8 +608,20 @@ function updateFavBtn() {
 }
 function toggleFav(ticker) {
   const t = ticker || cur; if (!t || !uid) return;
-  if (favs.includes(t)) deleteDoc(docRef('favoritos', t)).catch(e => alert('Erro: ' + (e.code || e.message)));
-  else setDoc(docRef('favoritos', t), {adicionadoEm: Date.now()}).catch(e => alert('Erro: ' + (e.code || e.message)));
+  const exists = favs.includes(t);
+  if (exists) {
+    favs = favs.filter(x => x !== t);
+    saveLocalFavs();
+    renderFavs();
+    updateFavBtn();
+    deleteDoc(docRef('favoritos', t)).catch(e => console.error('Erro ao remover favorito:', e));
+  } else {
+    favs = [...new Set([...favs, t])].sort();
+    saveLocalFavs();
+    renderFavs();
+    updateFavBtn();
+    setDoc(docRef('favoritos', t), {adicionadoEm: Date.now()}).catch(e => console.error('Erro ao salvar favorito:', e));
+  }
 }
 function renderFavs() {
   const sec = $('fav-sec');
@@ -431,8 +672,8 @@ const cardsHtml = list => list.map(t => {
   return `<div class="card" onclick="selectStockCard('${t}')"><b>${t}</b><br>${d ? BRL(d.price) + `<br><span class="${p >= 0 ? 'up' : 'dn'}">${p >= 0 ? '+' : ''}${p.toFixed(2)}%</span>` : '<small style="color:var(--mu)">carregando...</small>'}</div>`;
 }).join('');
 const FALLBACK = ['PETR4','VALE3','ITUB4','BBDC4','TAEE11','WEGE3','BBAS3','ABEV3'];
-function renderPop() { $('pop').innerHTML = cardsHtml(top21.length ? top21 : FALLBACK); }
-function renderQuedas() { $('pop-quedas').innerHTML = cardsHtml(top21Quedas.length ? top21Quedas : FALLBACK); }
+function renderPop() { $('pop').innerHTML = cardsHtml(top20.length ? top20.slice(0, 20) : FALLBACK); }
+function renderQuedas() { $('pop-quedas').innerHTML = cardsHtml(top20Quedas.length ? top20Quedas.slice(0, 20) : FALLBACK); }
 
 /* ===== CARTEIRA ===== */
 function saveHold() {
@@ -442,22 +683,36 @@ function saveHold() {
   clearTimeout(msgTimer); m.style.color = 'var(--em)'; m.textContent = `${t} adicionada.`;
   msgTimer = setTimeout(() => { m.textContent = ''; }, 10000);
   const aviso = setTimeout(() => alert('A cota ' + t + ' NÃO chegou ao servidor em 8 segundos. Veja o indicador ☁ no topo.'), 8000);
-  addDoc(colRef('cotas'), {t, q, p}).then(() => clearTimeout(aviso)).catch(e => {
+  const newId = (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now());
+  hold = [...hold, {id: newId, t, q, p}];
+  try { localStorage.setItem('local_hold:' + uid, JSON.stringify(hold)); } catch (e) {}
+  renderHold();
+  setDoc(docRef('cotas', newId), {t, q, p}).then(() => clearTimeout(aviso)).catch(e => {
     clearTimeout(aviso); cloud('☁ ERRO: ' + (e.code || e.message), false);
     alert('A cota ' + t + ' NÃO foi salva na nuvem: ' + (e.code || '') + ' ' + e.message);
   });
 }
 function updateQty(id, delta) {
   const item = hold.find(h => h.id === id); if (!item) return;
-  updateDoc(docRef('cotas', id), {q: Math.max(1, item.q + delta)}).catch(e => alert('Erro: ' + (e.code || e.message)));
+  const nextQ = Math.max(1, item.q + delta);
+  item.q = nextQ;
+  try { localStorage.setItem('local_hold:' + uid, JSON.stringify(hold)); } catch (e) {}
+  renderHold();
+  updateDoc(docRef('cotas', id), {q: nextQ}).catch(e => alert('Erro: ' + (e.code || e.message)));
 }
 function setQty(id, val) {
   const q = parseInt(val), item = hold.find(h => h.id === id);
   if (isNaN(q) || q < 1 || !item || item.q === q) return;
+  item.q = q;
+  try { localStorage.setItem('local_hold:' + uid, JSON.stringify(hold)); } catch (e) {}
+  renderHold();
   updateDoc(docRef('cotas', id), {q}).catch(e => alert('Erro: ' + (e.code || e.message)));
 }
 function rmHold(id) {
   if (!confirm('Remover esta cota?')) return;
+  hold = hold.filter(h => h.id !== id);
+  try { localStorage.setItem('local_hold:' + uid, JSON.stringify(hold)); } catch (e) {}
+  renderHold();
   deleteDoc(docRef('cotas', id)).catch(e => alert('Erro: ' + (e.code || e.message)));
 }
 const priceAt = (t, time) => {
