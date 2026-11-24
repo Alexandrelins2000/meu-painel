@@ -280,7 +280,7 @@ function enter(u) {
   $('who').textContent = u.displayName || u.email;
   resetIdleTimer();
 
-  const err = e => { $('live').textContent = '● nuvem offline (modo local)'; $('live').style.color = 'var(--mu)'; };
+  const err = e => { console.error('Firestore:', e); $('live').textContent = '● ERRO NUVEM: ' + (e.code || e.message); $('live').style.color = 'var(--rd)'; }
   let first = true;
 
   renderHold();
@@ -556,8 +556,10 @@ function saveHold() {
     m.textContent = '';
   }, 10000);
 
-  const novaCota = {t, q, p};
+    const novaCota = {t, q, p};
+  const aviso = setTimeout(() => alert('A cota ' + t + ' NÃO chegou ao servidor em 8 segundos. Veja o topo do painel e o Console (F12).'), 8000);
   col('cotas').add(novaCota).then(docRef => {
+    clearTimeout(aviso);
     novaCota.id = docRef.id;
     if (!hold.some(item => item.id === novaCota.id)) {
       hold.push(novaCota);
@@ -565,7 +567,8 @@ function saveHold() {
       renderHold();
     }
   }).catch(e => {
-    m.style.color = 'var(--rd)'; m.textContent = 'Erro ao salvar: ' + e.message;
+    clearTimeout(aviso);
+    alert('A cota ' + t + ' NÃO foi salva na nuvem: ' + (e.code || '') + ' ' + e.message);
   });
 }
 
